@@ -1,6 +1,20 @@
 # Memory Index — ipc_server
 
-## Projetos
+## Projetos (Em Progresso)
+- [30/07 🎯 ARQUITETURA FINAL — VPS + OneDrive + Mac](arquitetura_sistema_30_07_2026.md) — ✅ OneDrive sync desabilitado (liberou 184GB no Mac); arquitetura cloud-first: VPS="a máscara" (BD+API), OneDrive=source of truth (173GB), Mac=dev local (241GB livres); Graph API pronto; zero fragmentação de dados
+- [28/07 ✅ eSAJ fora do horário + 2FA quebrado — RESOLVIDOS](esaj_acesso_fora_horario.md) — era 1×/hora (`workers/main.py`), agora **só 6h/20h** (guarda de horário, deploy perito-v6-worker); e **religado** o endpoint `/esaj/codigo-2fa` (comentado em 22/07) que quebrava o login — testado E2E retorna código; ambos docker cp (efêmero) + commit
+- [28/07 🎨 Revisão UI Perito — 7 ajustes do Bruno](ui_ajustes_perito_280726.md) — itens 1,2,3,6 FEITOS (branch `fix/ui-ajustes-perito`, não deployado): fim do fake na dashboard, formatação BR, 6 setores, filtro despesas; **item 7 = campo `área` poluído** (SIMPLES/MÉDIO/lixo) precisa taxonomia do Bruno + migração; itens 4,5 pendentes de input
+- [27/07 🧰 Toolchains periciais instalados](toolchains_periciais.md) — 4 ferramentas livres+locais: **pyHanko** (assinatura laudo, ✅ provado), OCRmyPDF, faster-whisper, ExifTool; venv `v6/tools-pericia`; **falta integrar no Perito** (fase 2, em ordem); A3 assina no Windows
+- [26/07/26 ✅ GERÊNCIA FINANCEIRA LIVE](gerencia_financeira_modulo.md) — 🎉 3 telas (Gerência/Receitas/Despesas) no site; receitas **R$48,8M** (ProjetoCP+CONTROLE FIN 2012-2024) + despesas 2013-2023 (rateio corrigido, saldo positivo); falta 2008-2012 (.xls 136MB) + P6
+- [⚠️ Deploy VPS = docker cp, NÃO rebuild](deploy_vps_docker_cp.md) — contexto de build `backend_broken` está STRIPADO (2 routers); container rodando tem 44; rebuildar destrói prod; deploy via `docker cp` + restart (efêmero em recreate)
+- [25/07/26 ✅ DADOS IMPORTADOS](import_projuris_projetocp_feito.md) — 🎉 2182 Projuris + 4733 ProjetoCP = **6915 processos LIVE** na API/site ✅; técnica extração Firebird 1.5 documentada; psql user=`perito`, API filtra responsavel_id (setar =1)
+- [Sessão 23/07/26 DEPLOYMENT LIVE ✅ PRODUCTION](sessao_230723_deployment_live.md) — 🚀 Perito v6.0.0 LIVE em produção ✅; backend+frontend+db UP ✅; 4 processos no BD ✅; todos endpoints testados ✅; admin@ipcms.com.br / admin123 funcional ✅
+- [Sessão 23/07/26 INTEGRAÇÃO COMPLETA ✅ PRONTO PARA DEPLOY](sessao_230726_integracao_completa.md) — A1-A45 TDD rigoroso ✅; 802 Projuris + 35 ProjetoCP = 837 processos ✅; Docker + CI/CD ready ✅; 25+ testes, 80%+ coverage ✅; Push aguarda SSH key setup
+- [Sessão 22/07/26 BLOQUEADOR 🔴](sessao_220722_dashboard_bloqueador.md) — 403 Forbidden fixado ✅; Backend 100% pronto ✅; UI renderização bloqueada ⚠️; 95% pronto, awaiting dev tools debug
+- [Sessão 22/07/26 API LIVE ✅ PRONTO](sessao_220726_fix_final.md) — statusprocesso enum conflict resolvido ✅; /processos 200 OK ✅; E2E login→API testado ✅
+- [Sessão 22/07/26 — Autenticação Frontend ✅ FIXADA](sessao_220726_auth_fix.md) — Vite build 148 modules ✅; index.html restaurado ✅; incognito → login page ✅; bypass autenticação RESOLVIDO
+- [Sessão 20/07/26 — Sistema Operacional ✅ PRONTO](status_sistema_v6_20260720.md) — Ollama nativo VPS ✅; Qwen aquecendo ✅; 201 processos reais confirmados ✅; Backend API 200 OK ✅; E2E pronto amanhã
+- [Sessão 16/07/26 FINAL ✅ TUDO PRONTO](status_sessao_160726_final.md) — Migração 802 registros ✅; OneDrive protegido ✅; Análise 188 processos (83 vencidos) ✅; Relatórios completos ✅
 - [Sessão 16/07/26 — Sync Intimações + Migração CP ✅ PRONTOS](status_sessao_160726_sync_migracao.md) — mac_agent sync aplicado ✅; 188 processos + 138 intimações extraídos ✅; SQL idempotent pronto ✅
 - [Sessão 15/07/26 — Backend Restart & Roteamento 🔴 BLOQUEADO](status_sessao_150726_backend_restart.md) — Backend reiniciado ✅; Schema payments corrigido ✅; `/api/v1/parametros/*` com erro de roteamento HTTP 405 ⚠️; frontend login "Not authenticated"
 - [Sessão 14/07/26 — Cadastro Processo 🌙 MADRUGADA](status_sessao_140726_cadastro_processo_final.md) — Comarca/Vara/Juiz tabelas+rotas+models prontos; restart backend madrugada 15/07; frontend pronto para integrar
@@ -34,10 +48,12 @@
 
 ## Feedback e Regras de Trabalho
 - [🔓 MODO CTO DESTRANCADO](modo_cto_destrancado.md) — 16/07/26 ✅ ATIVO: Sem filtro, sem perguntas; pesquisa agressiva, recomendações ousadas, crítica honesta; linguagem descontraída OK; segurança+confiabilidade sempre
+- [Email adm@ipcs.com.br — NÃO DELETAR](regra_email_adm.md) — Crítico: preservar sempre; pode criar pastas proposta/impugnação dentro
 - [NADA de fake em produção](feedback_nada_fake_producao.md) — sistema vai p/ uso real; apagar artefatos de teste; migrar só dado real (VPS vivo é seed); estruturar com lógica
 - [9router → fallback Qwen](router_9router_qwen_fallback.md) — proxy local :20128 p/ continuar no Qwen 3.6 quando a cota do Claude esgota; falta config no dashboard; ⚠️ eu não me auto-troco, é o 9router que troca
-- [claude-code-router (CCR)](claude_code_router_ccr.md) — FIXO 1.0.73; `ccr code` roteia Qwen(pesado)+DeepSeek/NVIDIA(supervisão); Fable5(arremate)=`claude` normal; config chmod600 com nvapi key
-- [Gatilho "routerclaude"](routerclaude_trigger.md) — Bruno escreve "routerclaude" → eu orquestro daqui: Qwen faz o pesado, DeepSeek confere, eu (Fable) arremato; alias/clicável abrem a sessão CCR completa
+- [claude-code-router (CCR)](claude_code_router_ccr.md) — FIXO 1.0.73; `ccr code` roteia Qwen(pesado)+DeepSeek/NVIDIA(supervisão); **Opus 4.8(arremate, fallback Sonnet)**=`claude` normal; ⚠️ Fable virou pago; config chmod600 com nvapi key
+- [🆓 Comando "free"](free_command_local.md) — 27/07 `free`=`ccr code`=Claude Code 100% local (Qwen+DeepSeek via CCR), **custo ZERO** (sem Opus); vs routerclaude que tem arremate Opus; clicável `~/Desktop/FREE.command`
+- [Gatilho "routerclaude"](routerclaude_trigger.md) — Bruno escreve "routerclaude" → eu orquestro daqui: Qwen faz o pesado, DeepSeek confere, **eu (Opus 4.8) arremato** (25/07: era Fable); alias/clicável abrem a sessão CCR completa
 - [Fable 5 — Contexto Eficiente 20260709](fable5_contexto_20260709.md) — Estado do sistema, novo fluxo, o que falta, paths, credenciais
 - [Sem desculpas genéricas](feedback_sem_desculpas_genericas.md) — nunca usar "Como assistente de IA..." — ser direto
 - [Sem sumários desnecessários](feedback_sem_sumarios.md) — quando pedir trabalho direto, não resuma/explique ao final; work speaks for itself
@@ -45,7 +61,15 @@
 - [Commit automático padrão](feedback_commit_automatico.md) — após tarefas significativas, git add + commit + push sem avisar
 - [Selenium não funciona no Mac](feedback_selenium_nao_funciona.md) — usar VPS em vez disso, Chrome funciona em Linux
 
+## Skills Reutilizáveis
+- [🎯 Skill CodeMail](skill_codemail.md) — 25/07/26 ✅ Extração 2FA de email via Graph API; reutilizável para ESAJ/TJMS/SafeKey/NFS-e
+
 ## Referências
+- [27/07/26 🐢→⚡ FREE.command lento/quebrado — RESOLVIDO+TESTADO](free_command_lento_ram.md) — 2 causas: (1) 35B vaza 19% p/ CPU em 24GB; (2) Claude Code força thinking → modelo sem thinking dá **400** (coder models NÃO servem!); fix = **qwen3:14b** (thinking + 100% GPU, testado 200 OK)
+- [27/07/26 🔧 Boletos destruídos → recuperados via Graph](boletos_recuperacao_versao_graph.md) — 174 "ilegíveis" eram **sobrescritos por bug de rename 29/04**; versão anterior no SharePoint (Graph `Files.Read.All`, drive GERENCIA); **61 recuperados+conferidos**; senha fatura Itaú=`00022`; ⚠️ Qwen ALUCINA total de fatura (não usar)
+- [⚠️ TIPOS DE PERÍCIA](tipos_pericia.md) — 23/07/26 DEFINITIVO: Judicial, Extrajudicial, AT (Assistência Técnica); **MODALIDADE** de contratação (≠ SETOR/especialidade)
+- [⚠️ SETORES DA EMPRESA](setores_empresa.md) — 23/07/26 DEFINITIVO: 10=Contábil, 20=DNA, 30=Eng, 40=Grafo, 50=Multi, 60=Declina; **ESPECIALIDADE** (≠ TIPO/modalidade)
+- [✅ Sequência LOGIN + Código 2FA ESAJ](sequencia_login_codigo_2fa.md) — 17/07/26 VERIFICADO: CPF+Senha login → código via API `/api/v1/esaj/codigo-2fa` → validação → consulta CNJ; base para todas automações judiciais
 - [✅ Credenciais Azure — CONFIGURADAS](credenciais_azure_configuradas.md) — 14/07/26 LIVE: GRAPH_CLIENT_ID/SECRET em /var/www/perito-v6/backend/.env, Graph API conectado, emails TJMT pronto
 - [🔐 Auditoria de Credenciais VPS](credenciais_audit.md) — **LEIA PRIMEIRO ANTES DE PROCURAR CREDENCIAIS** — localização de todas as chaves, tokens, bancos, Azure/Graph API, como consultar DB, status de cada sistema
 - [Acervo laudos OneDrive](acervo_laudos_onedrive.md) — ~9.725 laudos reais rotulados por área (40=grafotécnica etc) e tipo (JD/EX); ouro p/ RAG + classificação de área pelo Qwen
