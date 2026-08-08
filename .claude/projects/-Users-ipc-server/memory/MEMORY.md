@@ -1,6 +1,7 @@
 # Memory Index — ipc_server
 
 ## Projetos (Em Progresso)
+- [07/08 ✅ ANÁLISE FORENSE LIVE](forensic_status_070826_live.md) — 🎉 Sistema 100% operacional: endpoint /analyze retorna 200 OK, **Sightengine integrada** (camada2_apis=1), 18 filtros locais + síntese Gemini; E2E testado (POST upload → GET resultado); Google Vision propagando (2-3 min)
 - [30/07 🎯 ARQUITETURA FINAL — VPS + OneDrive + Mac](arquitetura_sistema_30_07_2026.md) — ✅ OneDrive sync desabilitado (liberou 184GB no Mac); arquitetura cloud-first: VPS="a máscara" (BD+API), OneDrive=source of truth (173GB), Mac=dev local (241GB livres); Graph API pronto; zero fragmentação de dados
 - [28/07 ✅ eSAJ fora do horário + 2FA quebrado — RESOLVIDOS](esaj_acesso_fora_horario.md) — era 1×/hora (`workers/main.py`), agora **só 6h/20h** (guarda de horário, deploy perito-v6-worker); e **religado** o endpoint `/esaj/codigo-2fa` (comentado em 22/07) que quebrava o login — testado E2E retorna código; ambos docker cp (efêmero) + commit
 - [28/07 🎨 Revisão UI Perito — 7 ajustes do Bruno](ui_ajustes_perito_280726.md) — itens 1,2,3,6 FEITOS (branch `fix/ui-ajustes-perito`, não deployado): fim do fake na dashboard, formatação BR, 6 setores, filtro despesas; **item 7 = campo `área` poluído** (SIMPLES/MÉDIO/lixo) precisa taxonomia do Bruno + migração; itens 4,5 pendentes de input
@@ -47,6 +48,7 @@
 - [Perito v3.0 — Features](features_implementadas_v3.md) — Intimações DataJud, protocolo templates, cadastro expandido
 
 ## Feedback e Regras de Trabalho
+- [05/08/26 🛡️ DEPLOY SEGURO — estratégia que funciona](deployment_seguro_05_08_2026.md) — safe_deploy.sh: testa local + backup + sync + reinicia + valida críticos + rollback auto; forensic.py isolado (sem conflito com Laudo antigo) funcionando; .env VPS limpado de vars obsoletas
 - [🔓 MODO CTO DESTRANCADO](modo_cto_destrancado.md) — 16/07/26 ✅ ATIVO: Sem filtro, sem perguntas; pesquisa agressiva, recomendações ousadas, crítica honesta; linguagem descontraída OK; segurança+confiabilidade sempre
 - [Email adm@ipcs.com.br — NÃO DELETAR](regra_email_adm.md) — Crítico: preservar sempre; pode criar pastas proposta/impugnação dentro
 - [NADA de fake em produção](feedback_nada_fake_producao.md) — sistema vai p/ uso real; apagar artefatos de teste; migrar só dado real (VPS vivo é seed); estruturar com lógica
@@ -84,5 +86,6 @@
 - [Feedback: v6 shell vazio](feedback_v6_shell_vazio.md) — priorizar núcleo (dashboard+processos) antes de periférico; testar o que o usuário VÊ ao logar
 
 ## Phase 2 & Próximas
+- [04/08 ✅ Phases 2-5 Implementadas via /free](phases_2_3_4_5_implementadas.md) — Azure Key Vault + OneDrive Backup + LGPD Compliance + Security Hardening; 4h paralelo, bloqueador=conectividade Azure VPS (código 100% pronto)
 - [Phase 2: Azure Key Vault (22/07)](phase2_azure_keyvault_22_07.md) — migrar secrets .env → Vault seguro, 90min, pronto deploy
-- [Feedback: Nunca destruir sistema](feedback_nunca_destruir_sistema.md) — regra crítica — rollback plan, staging test, sem reset/clean destructivos
+- [Feedback: Nunca destruir sistema](feedback_nunca_destruir_sistema.md) — regra crítica — rollback plan, staging test, sem reset/clean destructivos; docker restart OK, docker rm -f ❌
