@@ -31,8 +31,9 @@
 **Tasks:**
 1. **Audit Dados Reais** — Exporta 6915 processos, mapeia dependências (código + BD)
 2. **Estrutura Modular Backend** — Cria pastas modularizadas (`modules/auth`, `modules/processos`, etc)
-3. **Staging Docker + Data Clone** — Anonimiza dados reais, setup DB staging, CI/CD pipeline
-4. **CI/CD Gates** — Auto-deploy develop → staging, testes rodam em staging, health checks
+3. **Design System Isolado** — Cria `frontend/src/core/design-system/` com componentes base, theme, Storybook
+4. **Staging Docker + Data Clone** — Anonimiza dados reais, setup DB staging, CI/CD pipeline
+5. **CI/CD Gates** — Auto-deploy develop → staging, testes rodam em staging, health checks
 
 **Dados Reais:**
 - `scripts/export_production.py` — Extrai 6915 processos + intimações do VPS (perito_prod)
@@ -43,6 +44,7 @@
 **Deliverables:**
 - ✅ Staging BD estável, 6915 processos presentes (anonimizados)
 - ✅ Dependency map: quais módulos importam quais (audit_imports.py output)
+- ✅ Design System isolado: componentes base, theme, Storybook pronto
 - ✅ CI/CD rodando: develop → staging auto-deploy, testes passam
 - ✅ Estrutura modular criada, zero acoplamento entre `app/modules/*`
 
@@ -51,6 +53,7 @@
 ✅ Staging health: GET /health retorna 200 OK
 ✅ Audit: Zero circular imports detectadas
 ✅ Dados: 6915 processos no staging, anonymization validada
+✅ Design System: Componentes base em Storybook, theme provider pronto
 ✅ CI/CD: develop branch push → staging deploy → tests pass
 ```
 
