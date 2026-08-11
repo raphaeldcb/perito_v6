@@ -1,0 +1,92 @@
+---
+name: v6-correcoes-producao
+description: "v6.0 corrigido e re-deployado (03/07/2026) — login OK, causas raiz do 'não funciona nada', o que falta configurar"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: 4c8277ee-7fb1-42ca-8056-ddfd2a975130
+---
+
+## Perito v6.0 — Correções pós code-review ultra (03/07/2026)
+
+**Estado: DEPLOYADO E TESTADO na VPS** (129.121.34.186, dir `/var/www/perito-v5.2/v6`). E2E 10/10: login admin (admin@ipcms.com.br/admin123), criação de usuário, kanban 6 colunas, fila ESAJ, SPA fallback, login via IP público pelo proxy nginx.
+
+**Causas raiz que quebravam tudo (não repetir):**
+- Frontend chamava `http://localhost:8000` hardcoded → agora `/api/v1` relativo via nginx (src/api/client.js único, interceptor de token + refresh).
+- Vite resolvia `App.jsx` antes de `App.tsx` → toda a árvore .tsx era código morto; deletada, tema dark/light + Kanban portados para .jsx.
+- `passlib 1.7.4` + bcrypt sem pin quebrava `hash_password` no seed → pin `bcrypt==4.0.1`; startup agora ABORTA se não houver admin ativo (database.py).
+- `admin@perito.local` rejeitado pelo EmailStr (TLD .local) → seed usa `ADMIN_EMAIL` env, default admin@ipcms.com.br.
+- Workers nunca rodavam (PM2 com cwd de Mac, compose sem serviço) → serviço `worker` no compose (`app/workers/main.py`, ciclo 10min).
+- Protocolo fabricava números aleatórios (risco de prazo perdido) → REMOVIDO; fila `Job` + registro manual `PATCH /kanban/cartoes/{id}/protocolo`; automático atrás de `PROTOCOLO_AUTOMATICO_ATIVO=1` (submissor v5.3 ainda é simulado — não ativar sem homologar).
+- ESAJ stub retornava sucesso falso → fila de jobs; `v6/scripts/mac_agent.py` roda NO MAC, chama `pipeline.esaj_dispatcher.baixar_autos_especifico` (Chrome+certificado) e reporta resultado real.
+
+**Segurança:** porta 5432 fechada, SECRET_KEY/POSTGRES_PASSWORD/AGENT_API_KEY gerados em `/var/www/perito-v5.2/v6/.env` (chmod 600), endpoint /teste removido, intimações com JWT obrigatório.
+
+**Integrações prontas:** Alembic configurado (migrations/), colunas `external_id`+`source_system` em Processo/Intimacao, upsert em `services/importer.py`, `POST /api/v1/importar/csv` e `/importar/projuris/sincronizar` (precisa PROJURIS_BASE_URL+PROJURIS_TOKEN).
+
+**Atualização 03/07 tarde:**
+- **Análise IA FUNCIONANDO sem API key**: ANALISE_MODO=agente — worker VPS enfileira job `analise_ia`, mac_agent roda no Ollama local do Mac (modelo `batiai/qwen3.6-35b:iq4`). Agente instalado como LaunchAgent permanente (`~/Library/LaunchAgents/com.ipc.perito-mac-agent.plist`, log em `~/Library/Logs/perito-mac-agent.log`, KeepAlive+RunAtLoad). Chave em `~/.perito_agent_key`.
+- **Email OAuth**: monitor suporta OAuth Azure (EWS_CLIENT_ID/SECRET/TENANT_ID). Bruno passou o secret value (guardado no .env da VPS) e um UUID (provavelmente ID do segredo, salvo como EWS_CLIENT_ID provisório). **FALTA**: EWS_TENANT_ID ("ID do diretório (locatário)"), confirmar o "ID do aplicativo (cliente)" e qual caixa de email ler (EWS_EMAIL).
+- **Token A3/SafeNet no Mac**: SAC + WebSigner + libeToken.dylib instalados corretamente, MAS token USB não detectado (system_profiler/smartcards vazios) e macOS é muito novo (Darwin 25) — SAC possivelmente incompatível. Erro "downgrade de proteção" = incompatibilidade SAC×token CC. **Caminho decidido pelo Bruno: ESAJ via usuário/senha + código de autenticação por email** (implementar no pipeline quando ele passar as credenciais do ESAJ; o código 2FA pode ser lido automaticamente da caixa conectada).
+- Projuris: Bruno vai solicitar a API; endpoints prontos aguardando PROJURIS_BASE_URL/TOKEN.
+
+**Atualização 03/07 noite — ciclo real comprovado:**
+- **E2E com dados REAIS**: job ESAJ → autos reais (0800472-51.2017.8.12.0037, PDF no OneDrive) → agente leu localmente → Qwen 3.6 35B analisou em 40s → VPS gravou "analisada" com partes/vara/urgência/resumo corretos (Ação Revisional de Alimentos, Itaporã/MS).
+- **Email migrado de EWS para Microsoft Graph** (app Azure tem Mail.Read+Mail.Send de aplicativo): `services/graph_mail.py` + monitor reescrito. Tenant descoberto via openid-configuration: `cb5ff6f4-4845-46fd-9eb6-5ca720f7ae7b`. Secret no .env da VPS. **FALTA SÓ GRAPH_CLIENT_ID** ("ID do aplicativo (cliente)" — Azure > Visão geral). Caixa: ipcms@ipcms.com.br.
+- **Relatório diário** (`workers/relatorios.py`): resumo de pendências/erros/filas por email às 8h para bruno@ipcms.com.br (REPORT_TO), liga junto com o Graph.
+- **ESAJ por CPF/senha**: `garantir_login` do intimacoes_v7.py (OneDrive, backup .bak-pre-cpf) agora tenta ESAJ_CPF/ESAJ_SENHA antes do certificado. Credenciais no plist do agente (CPF 00022358110). Login por senha ainda não exercitado contra o site (o processo de teste já estava baixado) — validar no primeiro download novo; se o ESAJ pedir código por email, ler automático via Graph quando conectar.
+- mac_agent: PDFs locais do Mac são lidos direto (sem passar pela VPS); PDFs da VPS baixados via /api/v1/jobs/{id}/arquivo.
+
+**Atualização 03/07 fim — email Graph, Parâmetros e ESAJ login por senha:**
+- **GRAPH_CLIENT_ID = 56fd2738-851e-4482-959d-c3fcea794d90** (Bruno mandou). Email Graph 100% OK: leitura real da caixa comprovada, capturas de intimações reais analisadas pelo Qwen local.
+- **Aba "Parâmetros do Sistema" no Admin** (models/parametro.py, routes/parametros.py, services/caminhos.py): 5 categorias (credenciais/urls/caminhos/valores/sistema), 23 parâmetros seed. Tradução Windows→Mac funcionando (detecta I:\, U:\, UNC; usa parâmetro mapa_unidades_windows JSON). Bruno edita senha/caminho na UI e o agente puxa via GET /api/v1/parametros/agente (X-Agent-Key) — troca sem redeploy. **Bruno precisa preencher mapa_unidades_windows** apontando I:/U: para as pastas reais do OneDrive.
+- **ESAJ login por CPF/senha + 2FA RESOLVIDO E TESTADO** (debug com screenshot): (1) campo CPF tem máscara CPF/CNPJ que corrompia send_keys → corrigido com _digitar_limpo (JS clear + Cmd+A + dígito a dígito). (2) senha dobrava → mesmo fix. (3) **2FA: e-SAJ envia código de 6 dígitos de saj-envio@tjms.jus.br para adm@ipcms.com.br** (ESAJ_2FA_MAILBOX) — chega também em ipcms@. Endpoint GET /api/v1/esaj/codigo-2fa lê via Graph (comprovado retornando 503737). intimacoes_v7.py (OneDrive) _preencher_codigo_2fa busca o código na VPS e preenche. CPF exibido correto 000.223.581-10, login aceito, tela "Validação de identificação" apareceu. Backup .bak-pre-cpf.
+- **eproc**: executor eproc_download no mac_agent, tipo de job pronto, sistema=eproc no endpoint baixar-autos. Aguardando eproc_tjms_login/senha (aba Parâmetros). URLs eproc1g/2g no seed.
+- **IMPORTANTE (cache Python)**: mac_agent é processo longo; ao editar intimacoes_v7.py SEMPRE reiniciar o agente (launchctl unload/load com.ipc.perito-mac-agent) senão usa versão em cache.
+- Agente Mac usa /opt/homebrew/bin/python3.11 (tem selenium+pypdf+requests). Plist com ESAJ_CPF/SENHA, OLLAMA_MODEL=batiai/qwen3.6-35b:iq4.
+
+**CICLO AUTÔNOMO 100% COMPROVADO (03/07 fim):** job 7 rodou ponta a ponta sem intervenção: login CPF/senha limpo → 2FA (código 967174 lido de adm@) → login OK → PDF baixado (0835860-89.2018.8.12.0001) → intimação id=8 criada → Qwen local analisou (Liquidação de Sentença, 2ª Vara Família CG/MS, partes Lucy/Luiz Barbedo, Fazenda Bom Retiro II). Regex CNJ apertado para exigir separadores (\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}) — boleto Unimed não vira mais falsa intimação. Falsa intimação id=6 removida.
+- **Pendente do Bruno:** (1) preencher mapa_unidades_windows na aba Parâmetros (I:/U: → pastas OneDrive); (2) login/senha eproc quando a migração liberar; (3) API Projuris.
+
+**Atualização 03/07 — coletadores, empresas e conciliação bancária:**
+- **2 empresas reais**: IPC MS PERICIAS LTDA (00.920.892/0001-49, Lucro Presumido) e IPC MS PESQUISA LTDA (14.424.142/0001-90, Simples Nacional, banco Inter). Modelo Empresa.
+- **348 coletadores importados** do login_coletadores.csv (backend/app/data_coletadores.csv). Login por CPF, senha padrão 123456, primeiro_acesso força atualização de cadastro (email/celular/pix/conta/endereço). Role 'coletador'.
+- **Portal do coletador restrito** (/coletador no frontend, ColetadorPortal.jsx): fluxo isolado, JWT subject 'col:<id>', vê SÓ comprovantes/termo/contrato/vídeo/outros. get_current_user rejeita tokens col: com 401 (testado: coletador em /users=401, admin=200). Termo de autorização preenchível (dados_formulario JSONB, exportável). Upload de documentos.
+- **Conciliação bancária** (services/conciliacao.py + routes/financeiro.py): admin sobe extrato CSV (colunas auto-detectadas), match automático por nome/apelido → coletador/usuário (ex: 'PIX ENVIADO Marzia'→coletador Marzia score 0.95, conciliado; fornecedor→pendente). Ajuste manual via PATCH /financeiro/lancamento/{id}. Abas Coletadores + Conciliação no Admin.
+- **Especialidades/áreas**: parâmetro 'especialidades' (8 áreas: contábil, grafotécnica, DNA, engenharia, médica, ambiental, psicológica, documentoscópica).
+- **Backups em ~/Downloads/**: perito-v6-backup-*.zip (código + esaj_pipeline/intimacoes_v7.py + plist + dump) e perito_v6_dump-*.sql.gz (20 tabelas, 348 coletadores). Dump gerado com pg_dump --clean --if-exists.
+- **Coletadores**: TODOS os 348 são da IPC MS Pesquisa (confirmado pelo Bruno). Modelo Coletador ganhou codigo_scpg (= ID do CSV login_coletadores.csv). Nome do comprovante segue padrão SCPG do PADRÃO.txt: CODIGO.ANO.MES.pdf (ex: 297.26.01.pdf), zero-padded 3 dígitos.
+
+**Atualização 03/07 — conciliação real de janeiro/2026 + OFX + sync OneDrive:**
+- **OFX parser** (Inter formato SGML): extrai favorecido do campo <NAME> (fallback <MEMO>). upload_extrato aceita OFX ou CSV.
+- **Match rigoroso** (services/conciliacao.py): coeficiente de Dice sobre tokens de nome, exige ≥2 tokens coincidentes + ≥1 token distintivo (não sobrenome comum). SEM match por apelido/primeiro nome isolado (aqui apelidos são o próprio primeiro nome → causavam falsos). Limiar 0.66. Testado: elimina falsos (Rogério≠Rubilene, Antonio≠Antonio homônimo, Pablo≠Marta) e mantém corretos.
+- **Janeiro/2026 Pesquisa processado** (extrato real, 84 lançamentos): 16 comprovantes corretos gerados (Elenilde, Vladir, Rubilene, Gleiz, Elizeni, Cristiane, Raimunda, Raiane, Marcio, Déborah, Natacha...), 67 pendentes (créditos/tarifas/impostos — revisar manual).
+- **Geração de comprovante PDF** (services/comprovante.py, fpdf2): PDF com pagador/favorecido/CPF/PIX/valor/data, nome SCPG. Fallback para nome se sem codigo_scpg.
+- **Sync VPS→OneDrive** (mac_agent.sincronizar_comprovantes + endpoints /financeiro/comprovantes/sync-lista e /{id}/arquivo, agent-auth): copia comprovantes para DIR_CONVENIADOS (.../DESPESAS/2026/00 - CONVENIADOS) PULANDO existentes (não duplica/apaga). Testado: 88→100 arquivos, existentes preservados. DIR_CONVENIADOS no plist do agente.
+- Portal do coletador tem download do PDF (/coletador/documentos/{id}/arquivo).
+
+**RESPOSTAS DO BRUNO (03/07):**
+1. **Código SCPG NÃO é o ID do CSV** — é outro código. Os 12 arquivos que gerei em CONVENIADOS foram REMOVIDOS (pasta de volta aos 88 originais intactos). Comprovantes da VPS também limpos. A conciliação de janeiro está preservada (17 matches corretos, 84 lançamentos) — só falta o mapeamento real coletador→código SCPG para regerar os PDFs com nome certo. PEDIR: export/planilha do SCPG com código de cada coletador (os nomes dos arquivos existentes 135/297/502/555/618/796.26.01.pdf são pistas do código real).
+2. **is_prestador agora EXCLUI da geração automática** (comprovante.py) — implementado. Bruno (código real a definir) deve ser marcado is_prestador.
+3. **NFe Campo Grande — ESTRUTURA PRONTA (06/07), emissão real pendente**:
+   - **Provedor: DSF** (nfse.campogrande.ms.gov.br). NÃO é ABRASF. **NÃO tem homologação** (só produção — por isso emissão real fica atrás de flag). Manual: nfse.pmcg.ms.gov.br/NotaFiscal/manuais.php.
+   - **Certificado A1**: /Users/ipc_server/Downloads/INSTITUTO DE PESQUISAS CIENTIFICAS LTDA_SENH 1234567.pfx, senha 1234567 (no nome do arquivo). É da IPC MS Pesquisa (CNPJ 14.424.142/0001-90), válido até fev/2027. Guardado na VPS em /data/certs/ipc_pesquisa_a1.pfx (chmod 600, fora do git). Senha em NFSE_CERT_SENHA no .env da VPS. Validado: certificado_ok=true.
+   - **Construído**: modelo NotaFiscal (processo_id, RPS, NFSe, tomador, serviço, status rascunho/emitida/erro/cancelada, dedup por perícia); services/nfse_dsf.py (scaffold: certificado_disponivel, montar_rps_xml, emitir com guarda NFSE_EMISSAO_ATIVA=0); routes/notas.py (POST /notas/pericia/{id} com dedup 409, GET status-emissao, listar, cancelar, sugerir-do-lancamento); aba 🧾 Notas Fiscais no Admin (status cert + botão emitir + lista + cancelar). Testado: 1ª emissão=rascunho, 2ª mesma perícia=409 dedup.
+   - **LAYOUT DSF PESQUISADO E IMPLEMENTADO (06/07)**: Manual oficial salvo em v6/docs/manual_nfse_dsf_campogrande.txt + ManualNFSeWebService.pdf. Webservice WsNFe2/LoteRps.jws: HOMOLOGAÇÃO https://issdigital-h.pmcg.ms.gov.br/WsNFe2/LoteRps.jws (existe! dá pra testar sem nota real; NÃO exige assinatura XML), PRODUÇÃO https://issdigital.pmcg.ms.gov.br/WsNFe2/LoteRps.jws (exige XMLDSig). SIAFI Campo Grande=9051. Envio de lote de RPS assinado. Métodos: enviar, consultarLote, ReqConsultaNotas, cancelamento.
+   - **services/nfse_dsf.py reescrito**: assinatura_rps() = concatenação 11 campos largura fixa (insc 11 + série 5 + número 12 + data yyyyMMdd + tributação 2 + situação 1 + tipoRecolh 1[A→N senão S] + valor-ded 15cent + dedução 15 + atividade 10 + tomador 14) → SHA-1. **VALIDADA contra o exemplo do manual: produz exatamente 6bcbb93fd7e6d7f0417656f4931ba9f92a7ac1da**. montar_lote_xml() (Cabecalho + RPS completo), _enviar_soap() (envelope SOAP método 'enviar'). NFSE_AMBIENTE=homologacao default.
+   - **status-emissao**: certificado_ok=true, assinatura validada, ambiente homologação. ÚNICA PENDÊNCIA: **NFSE_INSCRICAO_MUNICIPAL** (inscrição municipal da IPC Pesquisa em CG — NÃO é o CNPJ; Bruno precisa informar). Com ela, dá pra testar contra homologação.
+   - **06/07 config + teste homologação**: Inscrição municipal informada = **00041121009 (IPC MS PERÍCIAS, CNPJ 00.920.892/0001-49)**. Configurado prestador=Perícias no .env (NFSE_CNPJ=00920892000149, NFSE_RAZAO=IPC MS PERICIAS LTDA, NFSE_INSCRICAO_MUNICIPAL=00041121009). status-emissao: pendencias=[] (tudo pronto). XML do lote gerado corretamente com assinatura válida. Envio ao WS homologação CONECTOU mas retornou página "Serviços em Manutenção" — **WS da prefeitura temporariamente fora** (problema externo). RETENTAR o teste depois.
+   - **ATENÇÃO — mismatch empresa/certificado**: inscrição 00041121009 é da PERÍCIAS, mas o certificado A1 é da PESQUISA (14.424.142/0001-90). Homologação não exige cert (dá pra testar). Mas PRODUÇÃO exige cert com CNPJ = remetente → precisa do **certificado A1 da IPC MS PERÍCIAS** (pedir ao Bruno). Também falta o código de serviço/atividade correto de perícia e a alíquota ISS real (usei placeholders 10800/5%).
+   - **DUAS EMPRESAS/IMs (06/07)**: empresa.inscricao_municipal populada — Perícias(00.920.892/0001-49)=IM 00041121009; Pesquisa(14.424.142/0001-90, INSTITUTO DE PESQUISAS CIENTIFICAS)=IM 00164980006. Bruno disse ter mandado A1 de ambas MAS só o da Pesquisa está no Downloads. **Emitente ativo = PESQUISA** (cert+IM completos): NFSE_CNPJ=14424142000190, NFSE_INSCRICAO_MUNICIPAL=00164980006. pendencias=[].
+   - **AMBAS EMPRESAS PRONTAS (06/07)**: nfse_dsf.py refatorado para emitir POR EMPRESA (EMITENTES dict por CNPJ, cada uma com inscrição+certificado). Certificados na VPS: /data/certs/ipc_pericias_a1.pfx (senha ***REMOVED***, CNPJ 00920892000149) e /data/certs/ipc_pesquisa_a1.pfx (senha 1234567, CNPJ 14424142000190). Senhas em NFSE_SENHA_PERICIAS/NFSE_SENHA_PESQUISA no .env+compose. **Emitente padrão = PERÍCIAS** (NFSE_CNPJ_PADRAO=00920892000149) — perícias saem pela Perícias. status-emissao mostra AS DUAS com certificado_ok=true. Nota pode escolher emitente via payload.empresa_cnpj. Ambos os A1 validam (abrem com senha). Assinatura RPS validada.
+   - **CNAE + ISS + endereço tomador (06/07)**: CNAE Perícias=711970300 (7119-7/03), Pesquisa=864020201 (8640-2/02), ISS 5% ambos — em EMITENTES (usados como default do CodigoAtividade/AliquotaAtividade). Adicionados campos de endereço do tomador (obrigatórios no DSF) ao modelo NotaFiscal + XML: TipoLogradouro/Logradouro/Numero/Bairro/Cidade(SIAFI 9051)/CEP/Email. CPF do tomador zfill(14) no XML e na assinatura (consistente).
+   - **Caso de teste real (Bruno, p/ Pesquisa)**: processo 0800138-98.2023.8.12.0039, tomador Augusto Cesar Guerra Vieira CPF 908.493.531-49, Rua Manoel Inacio de Souza 720, Jardim dos Estados, Campo Grande/MS, CEP 79020-220, augusto.cesar@vieiraguerra.com.br. Script /tmp/test_augusto.py no container gera o XML correto (assinatura ok). Quando WS voltar: rodar com NFSE_EMISSAO_ATIVA=1 (homologação=seguro).
+   - **WS homologação AINDA em manutenção** (HTTP 503) em 06/07 — retentar (wakeup agendado). Nota: manter emissão em homologação até validar; produção precisa XMLDSig.
+   - **FALTA**: (a) retestar homologação quando WS voltar (503 externo), (b) certificado A1 da PERÍCIAS se ela for emitir (só Pesquisa chegou), (c) DECIDIR qual empresa emite a nota de perícia, (d) código serviço + alíquota ISS reais (placeholders 10800/5%), (e) XMLDSig do lote p/ produção, (f) ligar NFSE_EMISSAO_ATIVA. Gatilho 2 precisa vincular lançamento→perícia (422).
+
+**RESOLVIDO 06/07 — código SCPG REAL:**
+- Bruno mandou Locais_Coleta_452026.xls (aba Plan1: Nome + Código Interno, 341 coletadores, códigos 100-807). Extraído para v6/backend/app/scpg_codigos.json.
+- Casado por nome normalizado: 341/348 coletadores receberam codigo_scpg real (7 sem código são placeholders: FALECEU/Madney, NÃO IDENTIFICADO, TREINAMENTO, ESPECIAL...). seed_coletadores agora usa scpg_codigos.json (persiste em rebuild).
+- **CONFIRMAÇÃO do mapeamento**: os comprovantes de janeiro regenerados deram códigos 135,297,502,555,618,796 que JÁ EXISTIAM na pasta CONVENIADOS do Bruno = prova que o código está certo.
+- Janeiro reprocessado: 12 comprovantes PDF (135,297,301,447,502,555,618,654,693,700,790,796.26.01.pdf). Sync: 6 novos (301,447,654,693,700,790) adicionados, 6 pré-existentes preservados. Pasta 88→94. Arquivos de código errado (CSV ID) removidos.
+- **E-mail "no ar" enviado para bruno@ipcms.com.br** via Graph (confirmado em sentitems 06/07 11:05). Bruno pediu para avisar por email quando estivesse no ar (vê pelo celular).
