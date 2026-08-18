@@ -1,7 +1,9 @@
 # Memory Index — ipc_server
 
 ## Projetos (Em Progresso)
-- [11/08 ✅ DATABASE PERSISTENCE RESOLVIDO](database_persistence_resolved_08_11_2026.md) — 🎉 94 tabelas criadas+persistidas em PostgreSQL; login com JWT funcional; root cause: Wave 1 FK constraints + logging level; fix: wave1 deferred + logging.basicConfig + diagnostics
+- [13/08 ✅ AUTOLAUDOPRO E2E — 100% ACURÁCIA EM PRODUÇÃO](autolaudopro_e2e_producao_13_08.md) — 🎉 Extração de laudos validada: 9/9 campos críticos corretos; HTTP 200; 48.6s via Qwen local (tunnel SSH OK); pronto integração frontend + geração DOCX
+- [12/08 ✅ FERRAMENTAS MODULARIZAÇÃO COMPLETA — 17 ISOLADAS](ferramentas_modularizacao_12_08_2026.md) — 🎉 100% modular; cada ferramenta = pasta isolada (router+schemas+service); auto-discovery ativo; health 11/17 GREEN; mexer em 1 ≠ quebra outras
+- [11/08 ✅ DATABASE PERSISTENCE DEFINITIVAMENTE RESOLVIDO](database_persistence_resolved_11_08_2026.md) — 🎉 1.085 registros reais persistidos (188 processo+138 intimação+506 receita+253 despesa); root cause: DROP SCHEMA em cada startup; fix: fresh install detection via inspector.get_table_names(); dados sobrevivem restart; commit aeab8ef
 - [10/08 ⚠️ DIAGNÓSTICO: Roteamento de IAs — Fallback URGENTE](diagnostico_ia_routing_10_08_2026.md) — Perito v6 tem Qwen local (OK) + cerebro_intelligence.py, MAS **sem fallback automático**; OmniRoute já instalado em :20128 (coincide com OLLAMA_PROXY!), mas não integrado; RECOMENDAÇÃO: **Fazer Phase 0 (LLM Router) ANTES de modularização** — testes + staging em 1-2 dias; depois safe para refactor
 - [10/08 ✅ OmniRoute Instalado — 291 providers livres](omniroute_instalado.md) — 🚀 Gateway local integrado com /free: **~1.53B tokens livres/mês** de 90+ provedores (Kiro, OpenCode, Pollinations, DeepSeek, Groq, etc); token compression 15-95% (média 89%); 4 scripts + 5 docs; ready to use: `bash ~/.claude/omniroute/start-omniroute.sh --background`
 - [07/08 ✅ ANÁLISE FORENSE LIVE](forensic_status_070826_live.md) — 🎉 Sistema 100% operacional: endpoint /analyze retorna 200 OK, **Sightengine integrada** (camada2_apis=1), 18 filtros locais + síntese Gemini; E2E testado (POST upload → GET resultado); Google Vision propagando (2-3 min)
@@ -70,6 +72,7 @@
 - [🎯 Skill CodeMail](skill_codemail.md) — 25/07/26 ✅ Extração 2FA de email via Graph API; reutilizável para ESAJ/TJMS/SafeKey/NFS-e
 
 ## Referências
+- [12/08/26 ✅ GitHub Backup Configurado](github_backup_configurado.md) — SSH Deploy Key ativa, 4 branches pushed (main/develop/feature/v6-architecture/fix/ui-ajustes-perito), 32MB código clean, Private repo grátis
 - [27/07/26 🐢→⚡ FREE.command lento/quebrado — RESOLVIDO+TESTADO](free_command_lento_ram.md) — 2 causas: (1) 35B vaza 19% p/ CPU em 24GB; (2) Claude Code força thinking → modelo sem thinking dá **400** (coder models NÃO servem!); fix = **qwen3:14b** (thinking + 100% GPU, testado 200 OK)
 - [27/07/26 🔧 Boletos destruídos → recuperados via Graph](boletos_recuperacao_versao_graph.md) — 174 "ilegíveis" eram **sobrescritos por bug de rename 29/04**; versão anterior no SharePoint (Graph `Files.Read.All`, drive GERENCIA); **61 recuperados+conferidos**; senha fatura Itaú=`00022`; ⚠️ Qwen ALUCINA total de fatura (não usar)
 - [⚠️ TIPOS DE PERÍCIA](tipos_pericia.md) — 23/07/26 DEFINITIVO: Judicial, Extrajudicial, AT (Assistência Técnica); **MODALIDADE** de contratação (≠ SETOR/especialidade)
