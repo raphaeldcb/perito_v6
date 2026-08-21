@@ -1,0 +1,12 @@
+{
+  "conveniados": [
+    {
+      "id": "conveniado_01",
+      "nome": "Empresa Exemplo LTDA",
+      "cnpj": "***REMOVED***000190",
+      "inscricao_municipal": "123456",
+      "senha": "senha123",
+      "url_ws": "https://nfs-e.campogrande.ms.gov.br/ws/Nfs-e.asmx"
+    }
+  ]
+}
