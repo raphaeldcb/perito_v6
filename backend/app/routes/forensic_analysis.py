@@ -7,6 +7,7 @@ from app.models.analise_forense import AnaliseForenseResultado
 from app.services.database import SessionLocal
 from app.services.forensic_laudo_docx_generator import ForensicLaudoDocxGenerator
 from app.services.forensic_docx_to_pdf import ForensicDocxToPdf
+from app.services.email_service import EmailService
 import os
 import asyncio
 import logging
@@ -60,6 +61,32 @@ async def analyze_forensic(file: UploadFile = File(...)):
         analise.confianca_consenso = result['confianca_consenso']
         analise.nivel_risco = result['nivel_risco']
         db.commit()
+
+        # Send email notification (non-blocking — log warning on failure)
+        try:
+            email_svc = EmailService()
+            # Prepare analise dict for email notification
+            analise_email = {
+                "arquivo": file.filename or "documento",
+                "confianca": result.get('confianca_consenso', 0),
+                "tipo_pericia": result.get('tipo_pericia', 'Não determinado'),
+                "setor": result.get('setor', 'Não determinado'),
+                "riscos": result.get('nivel_risco', 'Não determinado'),
+                "campos_extraidos": result.get('campos_extraidos', {}),
+            }
+            # Call email service asynchronously (non-blocking)
+            usuario_id = 1  # TODO: Get from JWT/session context
+            email_result = await email_svc.enviar_notificacao(usuario_id, analise_email)
+            if not email_result:
+                logger.warning(
+                    f"Email notification failed, but processing continues | "
+                    f"arquivo: {file.filename} | usuario_id: {usuario_id}"
+                )
+        except Exception as e:
+            logger.warning(
+                f"Email notification failed with exception, but processing continues | "
+                f"arquivo: {file.filename} | erro: {e}"
+            )
 
         # Limpar
         os.remove(temp_path)
