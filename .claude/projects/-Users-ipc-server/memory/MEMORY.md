@@ -1,6 +1,7 @@
 # Memory Index — ipc_server
 
 ## Projetos (Em Progresso)
+- [11/09 ✅ DECOMMISSIONING PERITO SYSTEM + V5.x — CONCLUÍDO](decommissioning_legacy_sistemas_11_09_2026.md) — 🚀 Perito v6 é sistema único de produção; arquivos legados deletados (cópias em Backups-Perito/); zero dependências; 6.915 processos + dados completamente migrados; rollback plan documentado
 - [19/08 ✅ SEMGREP SECURITY SCANNING IMPLEMENTADO](semgrep_security_implemented.md) — 🔒 SAST (Static Analysis Security Testing) ativo: Homebrew v1.173.0 instalado; local backend+frontend 0 CRITICAL; GitHub Actions CI/CD auto-scan PR; script bash run-semgrep.sh [quick|full|ci]; custom rules .semgrep.yml (SQL/XSS/secrets); PRODUCTION READY
 - [18/08 ✅ SYSTEMATIC DEBUGGING COMPLETO — 5/6 BLOCKERES FIXADOS](checkpoint_18_08_2026_completo_final.md) — 🎉🎉🎉 Sistema 100% operacional: retry() backoff_factor ✅ + ferramentas dinâmico ✅ + OLLAMA_URL porta 11434 ✅ + pydantic dict_type seed ✅; health=200 OK (foi 503); apenas Redis não-crítico pending; pronto production
 - [13/08 ✅ AUTOLAUDOPRO E2E — 100% ACURÁCIA EM PRODUÇÃO](autolaudopro_e2e_producao_13_08.md) — 🎉 Extração de laudos validada: 9/9 campos críticos corretos; HTTP 200; 48.6s via Qwen local (tunnel SSH OK); pronto integração frontend + geração DOCX
