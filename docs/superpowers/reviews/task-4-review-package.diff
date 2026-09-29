@@ -1,0 +1,519 @@
+diff --git a/v6/backend/app/models/__init__.py b/v6/backend/app/models/__init__.py
+index c492055..1f8df26 100644
+--- a/v6/backend/app/models/__init__.py
++++ b/v6/backend/app/models/__init__.py
+@@ -1,19 +1,19 @@
+ from .base import Base
+ from .user import User
+ from .role import Role
+ from .permission import Permission
+ from .tool import Tool
+ from .tool_permission import ToolPermission
+ from .audit_log import AuditLog
+ from .kanban import Kanban, KanbanColuna, KanbanCartao, KanbanHistorico, Intimacao, Oficio, OfficioTemplateVersion
+-from .processo import Processo
++from .processo import Processo, SetorPericia
+ from .job import Job
+ from .parametro import Parametro
+ from .empresa import Empresa
+ from .coletador import Coletador, DocumentoColetador
+ from .financeiro import ExtratoBancario, LancamentoBancario
+ from .nota_fiscal import NotaFiscal
+ from .movimento import MovimentoProcesso
+ from .modelo import Modelo
+ from .indice_customizado import IndiceCustomizado
+ from .indice_cache import IndiceCache
+@@ -68,20 +68,21 @@ __all__ = [
+     "Role",
+     "Permission",
+     "Tool",
+     "ToolPermission",
+     "AuditLog",
+     "Kanban",
+     "KanbanColuna",
+     "KanbanCartao",
+     "KanbanHistorico",
+     "Processo",
++    "SetorPericia",
+     "Intimacao",
+     "Oficio",
+     "OfficioTemplateVersion",
+     "Laudo",
+     "LaudoVersao",
+     "AuditoriaFable",
+     "ClienteForense",
+     "MidiaOrigem",
+     "LaudoForense",
+     "StatusPagamento",
+diff --git a/v6/backend/app/models/processo.py b/v6/backend/app/models/processo.py
+index 559afd0..7f8c560 100644
+--- a/v6/backend/app/models/processo.py
++++ b/v6/backend/app/models/processo.py
+@@ -11,20 +11,49 @@ class TipoPericia(str, enum.Enum):
+ 
+ class StatusProcesso(str, enum.Enum):
+     # All values match legacy database format exactly
+     ATIVO = "ativo"
+     PROTOCOLADO = "protocolado"
+     EM_ANDAMENTO = "EM_ANDAMENTO"
+     ARQUIVADO = "Arquivado"
+     CONCLUIDO = "Concluído"
+     CANCELADO = "Cancelado"
+ 
++
++class SetorPericia(str, enum.Enum):
++    """Setores oficiais da empresa. Fonte única de verdade: v6/SETORES.md.
++
++    Coluna `Processo.setor` é armazenada como texto (nome), não código —
++    todo o app (dashboard.py, processos.py, valores.py) filtra por
++    igualdade de string com estes nomes. NÃO trocar para int sem migrar
++    todos os call-sites. NÃO inventar setor novo sem atualizar SETORES.md.
++    """
++    CONTABIL = "Contábil"
++    DNA = "DNA"
++    ENGENHARIA = "Engenharia"
++    GRAFOTECNICA = "Grafotécnica"
++    MULTIDISCIPLINAR = "Multidisciplinar"
++    DECLINA = "Declina"
++
++    @classmethod
++    def codigo(cls, setor: "SetorPericia | str") -> int:
++        """Código numérico canônico (10-60), conforme SETORES.md."""
++        mapa = {
++            cls.CONTABIL: 10, cls.DNA: 20, cls.ENGENHARIA: 30,
++            cls.GRAFOTECNICA: 40, cls.MULTIDISCIPLINAR: 50, cls.DECLINA: 60,
++        }
++        return mapa[cls(setor)]
++
++    @classmethod
++    def valores(cls) -> list[str]:
++        return [s.value for s in cls]
++
+ class Processo(Base, TimestampMixin):
+     __tablename__ = "processo"
+ 
+     id = Column(Integer, primary_key=True)
+     numero_cnj = Column(String(50), unique=True, nullable=False, index=True)
+     empresa_id = Column(Integer, ForeignKey("empresa.id"))
+     external_id = Column(String(100))
+     source_system = Column(String(50))
+ 
+     # Processo info
+diff --git a/v6/backend/app/modules/processos/schemas/processo_schema.py b/v6/backend/app/modules/processos/schemas/processo_schema.py
+index 61442ed..76f9692 100644
+--- a/v6/backend/app/modules/processos/schemas/processo_schema.py
++++ b/v6/backend/app/modules/processos/schemas/processo_schema.py
+@@ -1,16 +1,28 @@
+ """Pydantic schemas for Processo module."""
+ 
+ from typing import Optional, List, Any
+ from datetime import datetime
+ from decimal import Decimal
+-from pydantic import BaseModel, Field
++from pydantic import BaseModel, Field, field_validator
++
++from app.models.processo import SetorPericia
++
++
++def _validar_setor(v: Optional[str]) -> Optional[str]:
++    if v is None or v == "":
++        return v
++    if v not in SetorPericia.valores():
++        raise ValueError(
++            f"setor inválido: '{v}'. Use um de {SetorPericia.valores()} (ver SETORES.md)"
++        )
++    return v
+ 
+ 
+ class ProcessoCreateSchema(BaseModel):
+     """Schema for creating a new Processo."""
+ 
+     numero_cnj: str = Field(..., min_length=1, max_length=25, description="CNJ process number")
+     titulo: Optional[str] = Field(None, max_length=200)
+     descricao: Optional[str] = None
+     autor: Optional[str] = Field(None, max_length=200)
+     reu: Optional[str] = Field(None, max_length=200)
+@@ -27,20 +39,25 @@ class ProcessoCreateSchema(BaseModel):
+     forma_recebimento: Optional[str] = Field(None, max_length=20)
+     pago: Optional[bool] = False
+     prazo: Optional[datetime] = None
+     responsavel_id: Optional[int] = None
+     partes: Optional[List[Any]] = Field(default_factory=list)
+     laboratorio: Optional[str] = Field(None, max_length=150)
+     deslocamento: Optional[dict] = None
+     documentos: Optional[List[Any]] = Field(default_factory=list)
+     decisao_oficial_path: Optional[str] = Field(None, max_length=500)
+ 
++    @field_validator("setor")
++    @classmethod
++    def validar_setor(cls, v: Optional[str]) -> Optional[str]:
++        return _validar_setor(v)
++
+     class Config:
+         from_attributes = True
+ 
+ 
+ class ProcessoUpdateSchema(BaseModel):
+     """Schema for updating an existing Processo."""
+ 
+     titulo: Optional[str] = Field(None, max_length=200)
+     descricao: Optional[str] = None
+     autor: Optional[str] = Field(None, max_length=200)
+@@ -57,20 +74,25 @@ class ProcessoUpdateSchema(BaseModel):
+     honorarios: Optional[Decimal] = None
+     forma_recebimento: Optional[str] = Field(None, max_length=20)
+     pago: Optional[bool] = None
+     prazo: Optional[datetime] = None
+     partes: Optional[List[Any]] = None
+     laboratorio: Optional[str] = Field(None, max_length=150)
+     deslocamento: Optional[dict] = None
+     documentos: Optional[List[Any]] = None
+     decisao_oficial_path: Optional[str] = Field(None, max_length=500)
+ 
++    @field_validator("setor")
++    @classmethod
++    def validar_setor(cls, v: Optional[str]) -> Optional[str]:
++        return _validar_setor(v)
++
+     class Config:
+         from_attributes = True
+ 
+ 
+ class ProcessoResponseSchema(BaseModel):
+     """Schema for returning Processo data in responses."""
+ 
+     id: int
+     numero_cnj: str
+     titulo: Optional[str]
+diff --git a/v6/backend/app/routes/processos.py b/v6/backend/app/routes/processos.py
+index 5a34806..e282509 100644
+--- a/v6/backend/app/routes/processos.py
++++ b/v6/backend/app/routes/processos.py
+@@ -1,23 +1,23 @@
+ """Gestão de processos (perícias) — listar, ver detalhes, intimações e análise IA.
+ 
+ Esta é a tela central de trabalho: cada processo com suas intimações, o que a
+ IA extraiu (prazo, tipo, partes), status, e ações (baixar autos, emitir nota).
+ """
+ import logging
+ from datetime import datetime, timedelta
+ from fastapi import APIRouter, Depends, HTTPException, Query
+-from pydantic import BaseModel
++from pydantic import BaseModel, field_validator
+ from sqlalchemy.orm import Session
+ 
+ from app.middleware import get_current_user
+-from app.models import User, Processo, Intimacao, NotaFiscal, MovimentoProcesso
++from app.models import User, Processo, Intimacao, NotaFiscal, MovimentoProcesso, SetorPericia
+ from app.services import get_db
+ from app.services import ipca
+ 
+ logger = logging.getLogger(__name__)
+ 
+ router = APIRouter(prefix="/api/v1/processos", tags=["processos"])
+ 
+ 
+ @router.get("")
+ async def listar_processos(
+@@ -190,20 +190,31 @@ class ProcessoUpdate(BaseModel):
+     titulo: str | None = None
+     especialidade: str | None = None
+     autor: str | None = None
+     reu: str | None = None
+     doc: str | None = None
+     tipo: str | None = None
+     responsavel: str | None = None
+     honorarios: float | None = None
+     prazo: str | None = None  # ISO date
+ 
++    @field_validator("setor")
++    @classmethod
++    def validar_setor(cls, v: str | None) -> str | None:
++        if v is None or v == "":
++            return v
++        if v not in SetorPericia.valores():
++            raise ValueError(
++                f"setor inválido: '{v}'. Use um de {SetorPericia.valores()} (ver SETORES.md)"
++            )
++        return v
++
+ 
+ @router.patch("/{processo_id}")
+ async def atualizar_processo(
+     processo_id: int,
+     payload: ProcessoUpdate,
+     db: Session = Depends(get_db),
+     user: User = Depends(get_current_user),
+ ):
+     """FIX #8: Auth bypass — verificar empresa_id antes de atualizar.
+ 
+@@ -249,20 +260,29 @@ class ProcessoCreate(BaseModel):
+     juiz: str | None = None
+     partes: list | None = None  # [{papel, nome, doc}, ...]
+     participantes_dna: list | None = None
+     laboratorio: str | None = None
+     # Campos legados
+     titulo: str | None = None
+     autor: str | None = None
+     reu: str | None = None
+     especialidade: str | None = None
+ 
++    @field_validator("setor")
++    @classmethod
++    def validar_setor(cls, v: str) -> str:
++        if v not in SetorPericia.valores():
++            raise ValueError(
++                f"setor inválido: '{v}'. Use um de {SetorPericia.valores()} (ver SETORES.md)"
++            )
++        return v
++
+ 
+ @router.post("")
+ async def criar_processo(
+     payload: ProcessoCreate,
+     db: Session = Depends(get_db),
+     user: User = Depends(get_current_user),
+ ):
+     if db.query(Processo).filter(Processo.numero_cnj == payload.numero_cnj).first():
+         raise HTTPException(status_code=400, detail="Já existe processo com esse número")
+     p = Processo(
+diff --git a/v6/backend/scripts/migrate_area_enum.py b/v6/backend/scripts/migrate_area_enum.py
+new file mode 100644
+index 0000000..6707817
+--- /dev/null
++++ b/v6/backend/scripts/migrate_area_enum.py
+@@ -0,0 +1,140 @@
++#!/usr/bin/env python3
++"""Migra/normaliza o campo `Processo.setor` para o enum canônico (SetorPericia).
++
++NOTA HISTÓRICA (17/08/26): o plano original desta task assumia uma tabela
++`pericias.area` com lixo tipo SIMPLES/MÉDIO/COMPLEXO. Essa tabela não existe
++neste schema — o campo real e equivalente é `processo.setor` (texto livre),
++com `processo.especialidade` como sinal auxiliar para classificar setor
++quando setor está vazio. Ver app/models/processo.py:SetorPericia e SETORES.md.
++
++Investigação em produção (VPS, banco perito_v6, 17/08/26) mostrou que o
++banco foi resetado recentemente (188 processos, não mais os ~6900 antigos) e
++NÃO havia mais lixo tipo SIMPLES/MÉDIO/COMPLEXO — só 100% de `setor` vazio.
++Este script:
++
++1. Normaliza variações de caixa/espaço de valores já canônicos em `setor`
++   (defensivo, caso reapareçam via import futuro).
++2. Preenche `setor` a partir de `especialidade` SOMENTE nos mapeamentos de
++   alta confiança abaixo (documentados e revisáveis). Especialidades fora
++   dessa lista (ex.: "Medicina Legal") ou vazias são deixadas como estão —
++   não adivinha classificação de negócio sem confirmação do Bruno (mesmo
++   critério usado em 28/07, ver memory ui_ajustes_perito_280726.md).
++
++Uso:
++    python scripts/migrate_area_enum.py                # dry-run (só mostra)
++    python scripts/migrate_area_enum.py --apply         # aplica de fato
++    DATABASE_URL=postgresql://... python scripts/migrate_area_enum.py --apply
++"""
++
++import argparse
++import os
++import sys
++
++from sqlalchemy import create_engine, text
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++
++from app.models.processo import SetorPericia  # noqa: E402
++
++DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./v6.db")
++
++# especialidade (texto livre) -> setor canônico (alta confiança apenas)
++ESPECIALIDADE_PARA_SETOR = {
++    "DNA": SetorPericia.DNA.value,
++    "Avaliação Imobiliária": SetorPericia.ENGENHARIA.value,
++    "Engenharia Elétrica": SetorPericia.ENGENHARIA.value,
++    "Engenharia Civil": SetorPericia.ENGENHARIA.value,
++    "Automotiva": SetorPericia.ENGENHARIA.value,
++    "Segurança do Trabalho": SetorPericia.ENGENHARIA.value,
++}
++
++CANONICOS = SetorPericia.valores()
++
++
++def migrate(apply: bool = False) -> None:
++    engine = create_engine(DATABASE_URL)
++
++    with engine.begin() as conn:
++        print(f"Conectado em: {engine.url.render_as_string(hide_password=True)}\n")
++
++        # --- 1. estado atual ---
++        print("=== ANTES ===")
++        rows = conn.execute(
++            text("SELECT especialidade, setor, COUNT(*) c FROM processo "
++                 "GROUP BY especialidade, setor ORDER BY c DESC")
++        ).fetchall()
++        for r in rows:
++            print(f"  especialidade={r[0]!r:30} setor={r[1]!r:15} n={r[2]}")
++        if not rows:
++            print("  (tabela processo vazia)")
++
++        # --- 2. normalizar caixa/espaço em valores já canônicos ---
++        normalizados = 0
++        for canon in CANONICOS:
++            result = conn.execute(
++                text("UPDATE processo SET setor = :canon "
++                     "WHERE setor IS NOT NULL AND TRIM(setor) != '' "
++                     "AND setor != :canon AND LOWER(TRIM(setor)) = LOWER(:canon)"),
++                {"canon": canon},
++            )
++            normalizados += result.rowcount or 0
++
++        # --- 3. preencher setor vazio a partir de especialidade (alta confiança) ---
++        preenchidos = 0
++        for especialidade, setor in ESPECIALIDADE_PARA_SETOR.items():
++            result = conn.execute(
++                text("UPDATE processo SET setor = :setor "
++                     "WHERE especialidade = :especialidade "
++                     "AND (setor IS NULL OR TRIM(setor) = '')"),
++                {"setor": setor, "especialidade": especialidade},
++            )
++            preenchidos += result.rowcount or 0
++
++        # --- 4. flagar o que ficou fora do enum ou sem classificação ---
++        pendentes = conn.execute(
++            text("SELECT especialidade, COUNT(*) c FROM processo "
++                 "WHERE setor IS NULL OR TRIM(setor) = '' "
++                 "GROUP BY especialidade ORDER BY c DESC")
++        ).fetchall()
++
++        print(f"\n✅ Normalizados (caixa/espaço): {normalizados}")
++        print(f"✅ Preenchidos via especialidade (alta confiança): {preenchidos}")
++        print(f"\n⚠️  AINDA SEM setor (precisa decisão de negócio, não adivinhado):")
++        if pendentes:
++            for r in pendentes:
++                print(f"  especialidade={r[0]!r:30} n={r[1]}")
++        else:
++            print("  (nenhum)")
++
++        print("\n=== DEPOIS ===")
++        rows = conn.execute(
++            text("SELECT especialidade, setor, COUNT(*) c FROM processo "
++                 "GROUP BY especialidade, setor ORDER BY c DESC")
++        ).fetchall()
++        for r in rows:
++            print(f"  especialidade={r[0]!r:30} setor={r[1]!r:15} n={r[2]}")
++
++        if not apply:
++            print("\n🔎 DRY-RUN — nenhuma alteração persistida (rollback automático). "
++                  "Rode com --apply para gravar.")
++            raise _Rollback()
++
++
++class _Rollback(Exception):
++    """Usado só para forçar rollback do `engine.begin()` em modo dry-run."""
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--apply", action="store_true", help="Aplica as mudanças (default: dry-run)")
++    args = parser.parse_args()
++
++    try:
++        migrate(apply=args.apply)
++    except _Rollback:
++        pass
++    print("\n✅ Migração concluída!" if args.apply else "\n✅ Dry-run concluído.")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/v6/backend/tests/test_area_enum.py b/v6/backend/tests/test_area_enum.py
+new file mode 100644
+index 0000000..c02a8d0
+--- /dev/null
++++ b/v6/backend/tests/test_area_enum.py
+@@ -0,0 +1,88 @@
++"""Testes do enum SetorPericia (Task 4 bônus — limpeza do campo área/setor).
++
++NOTA: não existe tabela `pericias` neste schema (o plano original assumia
++isso). O campo real e equivalente é `Processo.setor`. Ver
++app/models/processo.py:SetorPericia e SETORES.md.
++"""
++
++import pytest
++from pydantic import ValidationError
++
++from app.models.processo import Processo, SetorPericia
++from app.routes.processos import ProcessoCreate, ProcessoUpdate
++
++
++def test_setor_pericia_valores_canonicos():
++    """Os 6 setores oficiais de SETORES.md, nem mais nem menos."""
++    assert SetorPericia.valores() == [
++        "Contábil", "DNA", "Engenharia", "Grafotécnica", "Multidisciplinar", "Declina",
++    ]
++
++
++def test_setor_pericia_codigo():
++    """Códigos numéricos batem com SETORES.md (10-60)."""
++    assert SetorPericia.codigo(SetorPericia.CONTABIL) == 10
++    assert SetorPericia.codigo(SetorPericia.DNA) == 20
++    assert SetorPericia.codigo(SetorPericia.ENGENHARIA) == 30
++    assert SetorPericia.codigo(SetorPericia.GRAFOTECNICA) == 40
++    assert SetorPericia.codigo(SetorPericia.MULTIDISCIPLINAR) == 50
++    assert SetorPericia.codigo(SetorPericia.DECLINA) == 60
++    # aceita string também
++    assert SetorPericia.codigo("DNA") == 20
++
++
++def test_setor_pericia_codigo_invalido_levanta():
++    with pytest.raises(ValueError):
++        SetorPericia.codigo("SIMPLES")
++
++
++# --- Validação nos schemas Pydantic (ProcessoCreate / ProcessoUpdate) ---
++
++def test_processo_create_aceita_setor_valido():
++    p = ProcessoCreate(numero_cnj="123", empresa_id=1, setor="DNA")
++    assert p.setor == "DNA"
++
++
++@pytest.mark.parametrize("lixo", ["SIMPLES", "MÉDIO", "COMPLEXO", "lixo", "VARA ÚNICA", "14657"])
++def test_processo_create_rejeita_setor_sujo(lixo):
++    with pytest.raises(ValidationError):
++        ProcessoCreate(numero_cnj="123", empresa_id=1, setor=lixo)
++
++
++def test_processo_update_aceita_setor_none():
++    """PATCH sem mexer no setor deve continuar permitido (campo opcional)."""
++    p = ProcessoUpdate(setor=None)
++    assert p.setor is None
++
++
++def test_processo_update_rejeita_setor_sujo():
++    with pytest.raises(ValidationError):
++        ProcessoUpdate(setor="COMPLEXO")
++
++
++def test_processo_update_aceita_setor_valido():
++    p = ProcessoUpdate(setor="Grafotécnica")
++    assert p.setor == "Grafotécnica"
++
++
++# --- Persistência real (SQLite in-memory via fixture db_session do conftest) ---
++
++def test_processo_persiste_setor_canonico(db_session):
++    p = Processo(numero_cnj="TEST-ENUM-001", especialidade="DNA", setor=SetorPericia.DNA.value)
++    db_session.add(p)
++    db_session.commit()
++
++    salvo = db_session.query(Processo).filter_by(numero_cnj="TEST-ENUM-001").first()
++    assert salvo.setor == "DNA"
++    assert salvo.setor in SetorPericia.valores()
++
++
++def test_processo_filtra_por_setor(db_session):
++    db_session.add_all([
++        Processo(numero_cnj="TEST-ENUM-002", setor=SetorPericia.ENGENHARIA.value),
++        Processo(numero_cnj="TEST-ENUM-003", setor=SetorPericia.DNA.value),
++    ])
++    db_session.commit()
++
++    eng = db_session.query(Processo).filter(Processo.setor == "Engenharia").all()
++    assert {p.numero_cnj for p in eng} == {"TEST-ENUM-002"}

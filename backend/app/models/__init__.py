@@ -23,8 +23,6 @@ from .oportunidade import Oportunidade
 from .esaj_config import EsajConfig
 from .protocolo import ItemProtocolo
 from .laudo import Laudo, LaudoVersao, AuditoriaFable
-from .forensic import ForensicAnalysis
-from .feature_flag import FeatureFlag
 from .engenharia import ModeloVistoria, Vistoria, VistoriaFoto, VistoriaAssinatura
 from .fluxo_honorarios import HistoricoJuiz
 from .despesa import Despesa
@@ -42,8 +40,11 @@ from .alerta import LaudoAlerta
 from .delegacao import Delegacao
 from .projetocp_financeiro import Financeiro, Pagamento, ParcelaFinanceira
 from .proposta import PropostaMotor, PropostaStatus, PropostaFeedback, PropostaAnalisador
-from .calculo import Calculo, CalculoVinculo, CalculoHistorico, CalculoArvoreDecisao
-from .feedback import FeedbackReport, FeedbackAttachment
+from .comunicacoes import EmailMessage, EmailConfig, EmailTemplate, EmailFeedback
+
+# Aliases para compatibilidade com código legado
+ComunicacaoMensagem = EmailMessage
+ComunicacaoConfig = EmailConfig
 
 __all__ = [
     "Job",
@@ -81,8 +82,6 @@ __all__ = [
     "Laudo",
     "LaudoVersao",
     "AuditoriaFable",
-    "ForensicAnalysis",
-    "FeatureFlag",
     "ModeloVistoria",
     "Vistoria",
     "VistoriaFoto",
@@ -125,10 +124,8 @@ __all__ = [
     "PropostaStatus",
     "PropostaFeedback",
     "PropostaAnalisador",
-    "Calculo",
-    "CalculoVinculo",
-    "CalculoHistorico",
-    "CalculoArvoreDecisao",
-    "FeedbackReport",
-    "FeedbackAttachment",
+    "EmailMessage",
+    "EmailConfig",
+    "EmailTemplate",
+    "EmailFeedback",
 ]

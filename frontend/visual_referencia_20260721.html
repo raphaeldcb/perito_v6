@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perito v6 - Sistema de Gestão de Perícias Judiciais</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #3b82f6;
+            --primary-dark: #1e40af;
+            --primary-light: #60a5fa;
+            --bg-main: #ffffff;
+            --bg-card: #f8fafc;
+            --bg-secondary: #f1f5f9;
+            --text-main: #1e293b;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        html.dark {
+            --primary-blue: #60a5fa;
+            --primary-dark: #3b82f6;
+            --primary-light: #93c5fd;
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --bg-secondary: #334155;
+            --text-main: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --border: #475569;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: var(--bg-main);
+            color: var(--text-main);
+            transition: background 0.3s, color 0.3s;
+        }
+
+        /* Header */
+        header {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow-sm);
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            color: var(--primary-blue);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .theme-toggle {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.3s;
+        }
+
+        .theme-toggle:hover {
+            background: var(--primary-blue);
+            color: white;
+        }
+
+        /* Navegação por abas */
+        .tab-nav {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--border);
+            padding: 0 1.5rem;
+            background: var(--bg-card);
+        }
+
+        .tab-btn {
+            padding: 1rem 1.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            color: var(--text-secondary);
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .tab-btn:hover {
+            color: var(--primary-blue);
+        }
+
+        .tab-btn.active {
+            color: var(--primary-blue);
+            border-bottom-color: var(--primary-blue);
+        }
+
+        /* Container principal */
+        main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .tab-content {
+            display: none;
+            width: 100%;
+            height: calc(100vh - 112px);
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Dashboard */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stat-card h3 {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-card .value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-blue);
+        }
+
+        .stat-card .subtitle {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .chart-container h3 {
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            color: var(--text-main);
+        }
+
+        .chart-canvas {
+            max-height: 300px;
+        }
+
+        /* Kanban */
+        .kanban-board {
+            display: flex;
+            gap: 1.5rem;
+            overflow-x: auto;
+            padding-bottom: 1rem;
+        }
+
+        .kanban-column {
+            flex: 0 0 300px;
+            background: var(--bg-secondary);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            min-height: 500px;
+        }
+
+        .kanban-column h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-main);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .kanban-column .count {
+            background: var(--primary-blue);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.8rem;
+        }
+
+        .kanban-cards {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            min-height: 100px;
+        }
+
+        .kanban-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            cursor: grab;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .kanban-card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        .kanban-card:active {
+            cursor: grabbing;
+        }
+
+        .kanban-card.dragging {
+            opacity: 0.5;
+        }
+
+        .kanban-card h4 {
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-main);
+        }
+
+        .kanban-card .meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Tabela de Processos */
+        .search-box {
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            background: var(--bg-card);
+            color: var(--text-main);
+            font-size: 0.95rem;
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .search-box button {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .search-box button:hover {
+            background: var(--primary-dark);
+        }
+
+        .table-wrapper {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        thead {
+            background: var(--bg-secondary);
+            border-bottom: 2px solid var(--border);
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tbody tr:hover {
+            background: var(--bg-secondary);
+            cursor: pointer;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .badge.nomeacao {
+            background: #fef08a;
+            color: #713f12;
+        }
+
+        .badge.vistoria {
+            background: #bfdbfe;
+            color: #1e3a8a;
+        }
+
+        .badge.redacao {
+            background: #fbcfe8;
+            color: #831843;
+        }
+
+        .badge.concluido {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge.especialidade {
+            background: var(--primary-light);
+            color: white;
+            font-size: 0.75rem;
+        }
+
+        .btn-small {
+            padding: 0.5rem 1rem;
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: 0.4rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .btn-small:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-main);
+            border-radius: 0.75rem;
+            box-shadow: var(--shadow-lg);
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+            width: 600px;
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            font-size: 1.35rem;
+            color: var(--text-main);
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        .close-btn:hover {
+            color: var(--text-main);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-body p {
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+
+        .modal-body .detail-row {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            margin-bottom: 1rem;
+            gap: 1rem;
+        }
+
+        .modal-body .detail-row strong {
+            color: var(--text-secondary);
+        }
+
+        /* Abas do Modal de Ferramentas */
+        .tool-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1.5rem;
+        }
+
+        .tool-tabs button {
+            flex: 1;
+            padding: 0.75rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--text-secondary);
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tool-tabs button.active {
+            color: var(--primary-blue);
+            border-bottom-color: var(--primary-blue);
+        }
+
+        .tool-tab-content {
+            display: none;
+        }
+
+        .tool-tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-main);
+            font-size: 0.95rem;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            background: var(--bg-card);
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.95rem;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .btn-primary {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .success-message {
+            background: #dcfce7;
+            color: #166534;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+            padding: 1rem;
+        }
+
+        .pagination button {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            cursor: pointer;
+            border-radius: 0.35rem;
+            transition: all 0.2s;
+        }
+
+        .pagination button:hover,
+        .pagination button.active {
+            background: var(--primary-blue);
+            color: white;
+            border-color: var(--primary-blue);
+        }
+
+        .scrollable-table {
+            overflow-x: auto;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .kanban-board {
+                flex-wrap: wrap;
+            }
+
+            .kanban-column {
+                flex: 0 0 280px;
+            }
+
+            .modal-content {
+                width: 95%;
+            }
+
+            .tab-nav {
+                overflow-x: auto;
+            }
+
+            table {
+                font-size: 0.8rem;
+            }
+
+            th, td {
+                padding: 0.75rem 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 Perito v6</h1>
+        <div class="header-right">
+            <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">🌙</button>
+        </div>
+    </header>
+
+    <nav class="tab-nav">
+        <button class="tab-btn active" data-tab="dashboard" onclick="switchTab(event)">📈 Dashboard</button>
+        <button class="tab-btn" data-tab="kanban" onclick="switchTab(event)">📋 Kanban</button>
+        <button class="tab-btn" data-tab="processos" onclick="switchTab(event)">📁 Processos</button>
+        <button class="tab-btn" data-tab="ferramentas" onclick="switchTab(event)">🔧 Ferramentas</button>
+    </nav>
+
+    <main>
+        <!-- DASHBOARD -->
+        <div id="dashboard" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total de Processos</h3>
+                    <div class="value">202</div>
+                    <div class="subtitle">Em gestão no sistema</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Receita Acumulada</h3>
+                    <div class="value">R$ 287.4k</div>
+                    <div class="subtitle">Últimos 12 meses</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Taxa de Conclusão</h3>
+                    <div class="value">78%</div>
+                    <div class="subtitle">Processos finalizados</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Tempo Médio Qwen</h3>
+                    <div class="value">8.3s</div>
+                    <div class="subtitle">Por análise</div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <h3>📈 Receita por Mês</h3>
+                    <canvas id="chartReceita" class="chart-canvas"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>📊 Volume por Especialidade</h3>
+                    <canvas id="chartEspecialidade" class="chart-canvas"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>✅ Taxa de Conclusão</h3>
+                    <canvas id="chartConclusao" class="chart-canvas"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>🎯 Distribuição de Status</h3>
+                    <canvas id="chartStatus" class="chart-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- KANBAN -->
+        <div id="kanban" class="tab-content">
+            <h2 style="margin-bottom: 1.5rem;">Fluxo de Trabalho</h2>
+            <div class="kanban-board" id="kanbanBoard"></div>
+        </div>
+
+        <!-- PROCESSOS -->
+        <div id="processos" class="tab-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2>Gestão de Processos</h2>
+                <button class="btn-small" onclick="openToolsModal()">🔍 Ferramentas</button>
+            </div>
+
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Buscar por CNJ, Autor ou Réu..." onkeyup="filterTable()">
+                <button onclick="filterTable()">Buscar</button>
+            </div>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>CNJ</th>
+                            <th>Autor</th>
+                            <th>Réu</th>
+                            <th>Especialidade</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="processosTable">
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination" id="pagination"></div>
+        </div>
+
+        <!-- FERRAMENTAS -->
+        <div id="ferramentas" class="tab-content">
+            <h2 style="margin-bottom: 1.5rem;">Ferramentas de Análise</h2>
+            <button class="btn-primary" onclick="openToolsModal()" style="max-width: 300px;">Abrir Ferramentas</button>
+        </div>
+    </main>
+
+    <!-- MODAL DE DETALHES DO PROCESSO -->
+    <div id="processModal" class="modal" onclick="if(event.target === this) closeModal('processModal')">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Detalhes do Processo</h2>
+                <button class="close-btn" onclick="closeModal('processModal')">✕</button>
+            </div>
+            <div class="modal-body" id="processDetails">
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE FERRAMENTAS -->
+    <div id="toolsModal" class="modal" onclick="if(event.target === this) closeModal('toolsModal')">
+        <div class="modal-content" style="width: 700px;">
+            <div class="modal-header">
+                <h2>🔧 Ferramentas de Análise</h2>
+                <button class="close-btn" onclick="closeModal('toolsModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="tool-tabs">
+                    <button class="active" data-tool="esaj" onclick="switchToolTab(event)">🔍 Busca ESAJ</button>
+                    <button data-tool="qwen" onclick="switchToolTab(event)">🧠 Análise Qwen</button>
+                    <button data-tool="oficio" onclick="switchToolTab(event)">📄 Gerador Ofício</button>
+                </div>
+
+                <!-- ABA: BUSCA ESAJ -->
+                <div class="tool-tab-content active" id="tool-esaj">
+                    <div class="form-group">
+                        <label>Número CNJ</label>
+                        <input type="text" id="esajCNJ" placeholder="Ex: 5000000-02.2026.0/12345">
+                    </div>
+                    <button class="btn-primary" onclick="searchESAJ()">
+                        Buscar no ESAJ
+                    </button>
+                    <div id="esajResult" style="margin-top: 1rem;"></div>
+                </div>
+
+                <!-- ABA: ANÁLISE QWEN -->
+                <div class="tool-tab-content" id="tool-qwen">
+                    <div class="form-group">
+                        <label>Selecione um Processo</label>
+                        <select id="processSelect" style="padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; width: 100%; background: var(--bg-card); color: var(--text-main);">
+                            <option>Carregando processos...</option>
+                        </select>
+                    </div>
+                    <button class="btn-primary" onclick="analyzeWithQwen()">
+                        Analisar com Qwen
+                    </button>
+                    <div id="qwenResult" style="margin-top: 1rem;"></div>
+                </div>
+
+                <!-- ABA: GERADOR OFÍCIO -->
+                <div class="tool-tab-content" id="tool-oficio">
+                    <div class="form-group">
+                        <label>Selecione um Processo</label>
+                        <select id="oficioProcessSelect" style="padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; width: 100%; background: var(--bg-card); color: var(--text-main);">
+                            <option>Carregando processos...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo de Ofício</label>
+                        <select id="oficioType" style="padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; width: 100%; background: var(--bg-card); color: var(--text-main);">
+                            <option value="nomeacao">Nomeação de Perito</option>
+                            <option value="aceite">Aceite da Nomeação</option>
+                            <option value="prazo">Extensão de Prazo</option>
+                            <option value="encerramento">Encerramento da Perícia</option>
+                        </select>
+                    </div>
+                    <button class="btn-primary" onclick="generateOficio()">
+                        Gerar Ofício
+                    </button>
+                    <div id="oficioResult" style="margin-top: 1rem;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== MOCK DATA =====
+        const mockProcessos = generateMockData(202);
+        let currentPage = 1;
+        const itemsPerPage = 20;
+        let charts = {};
+
+        function generateMockData(count) {
+            const especialidades = [
+                'Grafotécnica', 'Contábil', 'Engenharia', 'Medicina', 'Psicologia',
+                'Automotiva', 'Telecomunicações', 'Imobiliária', 'Agrária', 'Informática'
+            ];
+            const status = ['Nomeação', 'Vistoria', 'Redação', 'Concluído'];
+            const processo = [];
+
+            for (let i = 1; i <= count; i++) {
+                processo.push({
+                    id: i,
+                    cnj: `5000${String(i).padStart(6, '0')}-02.2026.0/12345`,
+                    autor: `Autor ${i}`,
+                    reu: `Réu ${i}`,
+                    especialidade: especialidades[Math.floor(Math.random() * especialidades.length)],
+                    status: status[Math.floor(Math.random() * status.length)],
+                    valor: (Math.random() * 50000 + 5000).toFixed(2),
+                    data: new Date(2026, Math.floor(Math.random() * 7), Math.floor(Math.random() * 28) + 1).toLocaleDateString('pt-BR'),
+                });
+            }
+            return processo;
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                document.querySelector('.theme-toggle').textContent = '🌙';
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                document.querySelector('.theme-toggle').textContent = '☀️';
+            }
+        }
+
+        function switchTab(e) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            e.target.classList.add('active');
+
+            const tabId = e.target.dataset.tab;
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+
+            if (tabId === 'dashboard') {
+                setTimeout(initDashboardCharts, 100);
+            } else if (tabId === 'kanban') {
+                initKanbanBoard();
+            } else if (tabId === 'processos') {
+                renderProcessosTable(1);
+            }
+        }
+
+        function initDashboardCharts() {
+            destroyCharts();
+
+            // Gráfico Receita
+            const ctxReceita = document.getElementById('chartReceita')?.getContext('2d');
+            if (ctxReceita) {
+                charts.receita = new Chart(ctxReceita, {
+                    type: 'line',
+                    data: {
+                        labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                        datasets: [{
+                            label: 'Receita (R$ mil)',
+                            data: [15, 18, 22, 25, 28, 32, 35, 38, 40, 42, 45, 48],
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 5,
+                            pointBackgroundColor: '#3b82f6',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: { legend: { display: true } },
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
+            }
+
+            // Gráfico Especialidade
+            const ctxEspecialidade = document.getElementById('chartEspecialidade')?.getContext('2d');
+            if (ctxEspecialidade) {
+                charts.especialidade = new Chart(ctxEspecialidade, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Grafotécnica', 'Contábil', 'Engenharia', 'Medicina', 'Psicologia', 'Outros'],
+                        datasets: [{
+                            data: [45, 35, 28, 22, 18, 54],
+                            backgroundColor: [
+                                '#3b82f6', '#60a5fa', '#93c5fd',
+                                '#f59e0b', '#ec4899', '#8b5cf6'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: { legend: { position: 'bottom' } }
+                    }
+                });
+            }
+
+            // Gráfico Conclusão
+            const ctxConclusao = document.getElementById('chartConclusao')?.getContext('2d');
+            if (ctxConclusao) {
+                charts.conclusao = new Chart(ctxConclusao, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4'],
+                        datasets: [{
+                            label: 'Processados (%)',
+                            data: [65, 72, 78, 78],
+                            backgroundColor: '#22c55e'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: { legend: { display: true } },
+                        scales: { y: { beginAtZero: true, max: 100 } }
+                    }
+                });
+            }
+
+            // Gráfico Status
+            const ctxStatus = document.getElementById('chartStatus')?.getContext('2d');
+            if (ctxStatus) {
+                charts.status = new Chart(ctxStatus, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Nomeação', 'Vistoria', 'Redação', 'Concluído'],
+                        datasets: [{
+                            data: [18, 32, 28, 124],
+                            backgroundColor: ['#fef08a', '#bfdbfe', '#fbcfe8', '#dcfce7']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: { legend: { position: 'bottom' } }
+                    }
+                });
+            }
+        }
+
+        function destroyCharts() {
+            Object.values(charts).forEach(chart => {
+                if (chart) chart.destroy();
+            });
+            charts = {};
+        }
+
+        function initKanbanBoard() {
+            const board = document.getElementById('kanbanBoard');
+            board.innerHTML = '';
+
+            const columns = [
+                { id: 1, title: 'Nomeação', color: '#fef08a' },
+                { id: 2, title: 'Vistoria', color: '#bfdbfe' },
+                { id: 3, title: 'Redação', color: '#fbcfe8' },
+                { id: 4, title: 'Concluído', color: '#dcfce7' }
+            ];
+
+            columns.forEach(col => {
+                const colEl = document.createElement('div');
+                colEl.className = 'kanban-column';
+                colEl.ondrop = (e) => onDrop(e, col.id);
+                colEl.ondragover = (e) => e.preventDefault();
+
+                const cardsInCol = mockProcessos.filter(p => p.status === col.title);
+
+                colEl.innerHTML = `
+                    <h3>${col.title} <span class="count">${cardsInCol.length}</span></h3>
+                    <div class="kanban-cards" id="col-${col.id}">
+                        ${cardsInCol.map(card => `
+                            <div class="kanban-card" draggable="true" data-id="${card.id}" ondragstart="onDragStart(event)" ondragend="onDragEnd(event)">
+                                <h4>${card.cnj.substring(0, 20)}...</h4>
+                                <div class="meta">
+                                    <span>${card.especialidade}</span>
+                                    <span>R$ ${parseFloat(card.valor).toLocaleString('pt-BR', {minimumFractionDigits: 0})}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                board.appendChild(colEl);
+            });
+        }
+
+        let draggedCard = null;
+
+        function onDragStart(e) {
+            draggedCard = e.target.closest('.kanban-card');
+            draggedCard.classList.add('dragging');
+        }
+
+        function onDragEnd(e) {
+            if (draggedCard) draggedCard.classList.remove('dragging');
+        }
+
+        function onDrop(e, colId) {
+            e.preventDefault();
+            if (!draggedCard) return;
+
+            const columns = ['Nomeação', 'Vistoria', 'Redação', 'Concluído'];
+            const processId = parseInt(draggedCard.dataset.id);
+            const processo = mockProcessos.find(p => p.id === processId);
+            if (processo) {
+                processo.status = columns[colId - 1];
+            }
+
+            const col = document.getElementById(`col-${colId}`);
+            col.appendChild(draggedCard);
+            draggedCard.classList.remove('dragging');
+            draggedCard = null;
+        }
+
+        function renderProcessosTable(page) {
+            currentPage = page;
+            const start = (page - 1) * itemsPerPage;
+            const filtered = mockProcessos.filter(p => {
+                const search = document.getElementById('searchInput')?.value.toLowerCase() || '';
+                return !search ||
+                       p.cnj.toLowerCase().includes(search) ||
+                       p.autor.toLowerCase().includes(search) ||
+                       p.reu.toLowerCase().includes(search);
+            });
+
+            const paginatedData = filtered.slice(start, start + itemsPerPage);
+            const tbody = document.getElementById('processosTable');
+
+            tbody.innerHTML = paginatedData.map(p => `
+                <tr onclick="openProcessModal(${p.id})">
+                    <td>${p.cnj}</td>
+                    <td>${p.autor}</td>
+                    <td>${p.reu}</td>
+                    <td><span class="badge badge-especialidade">${p.especialidade}</span></td>
+                    <td><span class="badge ${p.status.toLowerCase()}">${p.status}</span></td>
+                    <td>
+                        <button class="btn-small" onclick="event.stopPropagation(); analyzeProcess(${p.id})">Analisar</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Paginação
+            const totalPages = Math.ceil(filtered.length / itemsPerPage);
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = '';
+
+            for (let i = 1; i <= totalPages; i++) {
+                const btn = document.createElement('button');
+                btn.textContent = i;
+                if (i === page) btn.classList.add('active');
+                btn.onclick = () => renderProcessosTable(i);
+                pagination.appendChild(btn);
+            }
+        }
+
+        function filterTable() {
+            renderProcessosTable(1);
+        }
+
+        function openProcessModal(processId) {
+            const processo = mockProcessos.find(p => p.id === processId);
+            if (!processo) return;
+
+            const details = document.getElementById('processDetails');
+            details.innerHTML = `
+                <div class="detail-row">
+                    <strong>CNJ:</strong>
+                    <span>${processo.cnj}</span>
+                </div>
+                <div class="detail-row">
+                    <strong>Autor:</strong>
+                    <span>${processo.autor}</span>
+                </div>
+                <div class="detail-row">
+                    <strong>Réu:</strong>
+                    <span>${processo.reu}</span>
+                </div>
+                <div class="detail-row">
+                    <strong>Especialidade:</strong>
+                    <span>${processo.especialidade}</span>
+                </div>
+                <div class="detail-row">
+                    <strong>Status:</strong>
+                    <span><span class="badge ${processo.status.toLowerCase()}">${processo.status}</span></span>
+                </div>
+                <div class="detail-row">
+                    <strong>Valor:</strong>
+                    <span>R$ ${parseFloat(processo.valor).toLocaleString('pt-BR')}</span>
+                </div>
+                <div class="detail-row">
+                    <strong>Data:</strong>
+                    <span>${processo.data}</span>
+                </div>
+            `;
+            document.getElementById('processModal').classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function openToolsModal() {
+            document.getElementById('toolsModal').classList.add('active');
+        }
+
+        function switchToolTab(e) {
+            document.querySelectorAll('.tool-tabs button').forEach(btn => btn.classList.remove('active'));
+            e.target.classList.add('active');
+
+            const toolId = e.target.dataset.tool;
+            document.querySelectorAll('.tool-tab-content').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(`tool-${toolId}`).classList.add('active');
+        }
+
+        function searchESAJ() {
+            alert('Função ESAJ a implementar');
+        }
+
+        function analyzeWithQwen() {
+            alert('Função Qwen a implementar');
+        }
+
+        function generateOficio() {
+            alert('Função Ofício a implementar');
+        }
+
+        function analyzeProcess(id) {
+            alert(`Analisar processo ${id}`);
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+                document.querySelector('.theme-toggle').textContent = '☀️';
+            }
+            renderProcessosTable(1);
+        });
+    </script>
+</body>
+</html>

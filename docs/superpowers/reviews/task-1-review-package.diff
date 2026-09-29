@@ -1,0 +1,195 @@
+diff --git a/v6/backend/app/modules/ferramentas/__init__.py b/v6/backend/app/modules/ferramentas/__init__.py
+index f6777df..d37656f 100644
+--- a/v6/backend/app/modules/ferramentas/__init__.py
++++ b/v6/backend/app/modules/ferramentas/__init__.py
+@@ -71,21 +71,21 @@ from .cerebro import (
+     cerebro_router,
+ )
+ from .auto_laudo_pro import (
+     ProcessUploadRequest,
+     ExtracaoResponse,
+     LaudoGeradoResponse,
+     ValidarEficienciaResponse,
+     ExtractionData,
+     QuesitosAgrupados,
+     Quesito,
+-    router as auto_laudo_pro_router,
++    auto_laudo_pro_router,
+ )
+ 
+ __all__ = [
+     # Calculator Schemas
+     "DeslocamentoRequest",
+     "DeslocamentoResponse",
+     "JurosRequest",
+     "JurosResponse",
+     "CalculatorResponse",
+     # CNJ Schemas
+diff --git a/v6/backend/app/services/cerebro_engine.py b/v6/backend/app/services/cerebro_engine.py
+index 43036f9..084d558 100644
+--- a/v6/backend/app/services/cerebro_engine.py
++++ b/v6/backend/app/services/cerebro_engine.py
+@@ -28,20 +28,21 @@ logger = logging.getLogger(__name__)
+ 
+ 
+ class NodeStatus(str, Enum):
+     """Estado de um nó durante execução."""
+     PENDING = "pending"
+     RUNNING = "running"
+     COMPLETED = "completed"
+     FAILED = "failed"
+     RETRYING = "retrying"
+     SKIPPED = "skipped"
++    ROLLED_BACK = "rolled_back"
+ 
+ 
+ class ExecutionStatus(str, Enum):
+     """Estado de uma execução."""
+     QUEUED = "queued"
+     RUNNING = "running"
+     COMPLETED = "completed"
+     FAILED = "failed"
+     PAUSED = "paused"
+     ROLLED_BACK = "rolled_back"
+diff --git a/v6/backend/requirements_v6.txt b/v6/backend/requirements_v6.txt
+index dd6e43d..72ba5d8 100644
+--- a/v6/backend/requirements_v6.txt
++++ b/v6/backend/requirements_v6.txt
+@@ -82,10 +82,21 @@ black==23.12.0
+ flake8==6.1.0
+ isort==5.13.2
+ mypy==1.7.1
+ num2words
+ geopy==2.4.0
+ 
+ # PDF generation for engineering reports
+ reportlab>=4.0
+ fpdf2>=2.7.0
+ google-auth==2.28.0
++
++# Browser automation — TJMS/e-SAJ download de autos (routers tjms, inter_api)
++# NOTA: imagem Docker não roda `playwright install chromium` — pacote Python
++# importa OK mas automação real de browser falha em runtime até isso ser
++# adicionado ao Dockerfile. Ver Task 1 report para detalhes.
++playwright==1.61.0
++
++# Cron expression parsing — app/services/cerebro_triggers.py (scheduler de
++# workflows do Cérebro). Não é importado por nenhum router atualmente
++# carregado, mas é dependência real do módulo e do seu teste.
++croniter==2.0.1
+diff --git a/v6/backend/tests/test_build_integrity.py b/v6/backend/tests/test_build_integrity.py
+new file mode 100644
+index 0000000..3220189
+--- /dev/null
++++ b/v6/backend/tests/test_build_integrity.py
+@@ -0,0 +1,110 @@
++"""
++Build integrity tests — garante que o build context não fica "stripado".
++
++Contexto (2026-08-17, plano perito-v6-fixes-criticos, Task 1): produção rodava
++com routers colados via `docker cp` que nunca chegavam a um `git commit` /
++`requirements_v6.txt` correspondente. Um rebuild do zero (`docker build`)
++perdia esses routers silenciosamente porque `app/routes/__init__.py` e
++`app/config/module_loader.py` engolem erro de import por design (nunca
++derrubar o app por 1 módulo quebrado — ver comentário "never again
++2026-07-27" em app/routes/__init__.py).
++
++Este teste garante que TODOS os routers listados no código carregam de
++fato, com as dependências declaradas em requirements_v6.txt — ou seja,
++que um `docker build` limpo reproduz o que está rodando em produção.
++"""
++
++from app.routes import _ROUTERS as LEGACY_ROUTERS
++from app.config.module_loader import MODULES_TO_LOAD, MULTIHANDLER_MODULES
++
++
++def test_app_loads_without_crashing():
++    """`from app.main import app` não pode lançar exceção."""
++    from app.main import app
++
++    assert app is not None
++
++
++def test_all_legacy_routers_load_with_declared_dependencies():
++    """
++    Reimporta app.routes do zero e confere que NENHUM dos 43 routers do
++    _ROUTERS (app/routes/__init__.py) foi pulado por ImportError.
++
++    Se este teste falhar, uma dependência usada por um router não está em
++    requirements_v6.txt (mesmo que esteja instalada manualmente em produção).
++    """
++    import importlib
++    import app.routes as routes_module
++
++    importlib.reload(routes_module)
++
++    expected = {mod for mod, _, _ in LEGACY_ROUTERS}
++    carregados = set(routes_module._carregados)
++    pulados = set(routes_module._pulados)
++
++    assert pulados == set(), (
++        f"Routers pulados por dependência faltante: {pulados}. "
++        f"Adicione o pacote correspondente em requirements_v6.txt."
++    )
++    assert carregados == expected
++
++
++def test_ferramentas_module_exposes_all_declared_routers():
++    """
++    Regressão do bug real encontrado nesta task: `auto_laudo_pro/router.py`
++    (arquivo) sombreava `auto_laudo_pro_router` (APIRouter) em
++    app/modules/ferramentas/__init__.py por causa de
++    `from .auto_laudo_pro import router as auto_laudo_pro_router` — Python
++    resolve o atributo `router` do pacote como o SUBMÓDULO importado como
++    efeito colateral, não como o nome que auto_laudo_pro/__init__.py exporta.
++
++    Fix: importar o nome já correto (`auto_laudo_pro_router`) direto, sem
++    apelidar `router`.
++    """
++    from fastapi.routing import APIRouter
++    import app.modules.ferramentas as ferramentas
++
++    for attr_name in MULTIHANDLER_MODULES["ferramentas"]:
++        router_obj = getattr(ferramentas, attr_name)
++        assert isinstance(router_obj, APIRouter), (
++            f"app.modules.ferramentas.{attr_name} deveria ser um APIRouter, "
++            f"mas é {type(router_obj)!r}"
++        )
++
++
++def test_module_loader_loads_all_modules_with_routers():
++    """
++    Dos módulos em MODULES_TO_LOAD, todos que declaram (ou deveriam
++    declarar) um router público devem carregar. `infra` é exceção conhecida
++    e documentada (__all__ = [] — "Reserved for future infrastructure
++    endpoints"), então não conta como falha.
++    """
++    from app.config.module_loader import load_module_routers
++    from fastapi import FastAPI
++
++    app = FastAPI()
++    result = load_module_routers(app)
++
++    known_empty_modules = {"infra"}
++    unexpected_failures = set(result["failed"]) - known_empty_modules
++
++    assert unexpected_failures == set(), (
++        f"Módulos com router esperado que falharam ao carregar: {unexpected_failures}"
++    )
++    assert set(MODULES_TO_LOAD) - known_empty_modules <= set(result["loaded"])
++
++
++def test_route_count_matches_production_baseline():
++    """
++    Guarda-corpo simples: menos de 400 rotas registradas é sinal de que o
++    build voltou a ficar "stripado" (produção com 43 routers legacy + 6
++    módulos = 465 rotas em 2026-08-17). Ajuste o baseline se novos routers
++    forem adicionados deliberadamente.
++    """
++    from app.main import app
++
++    assert len(app.routes) >= 400, (
++        f"Só {len(app.routes)} rotas registradas — esperado >= 400. "
++        f"Build pode estar sem routers (ver app/routes/__init__.py e "
++        f"app/config/module_loader.py nos logs de startup)."
++    )

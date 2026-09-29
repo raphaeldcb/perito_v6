@@ -1,0 +1,483 @@
+diff --git a/v6/backend/app/config/settings.py b/v6/backend/app/config/settings.py
+index 69b0b14..a31228a 100644
+--- a/v6/backend/app/config/settings.py
++++ b/v6/backend/app/config/settings.py
+@@ -45,20 +45,25 @@ class Settings(BaseSettings):
+     cors_headers: list[str] = [
+         header.strip()
+         for header in os.getenv("CORS_HEADERS", "Content-Type,Authorization").split(",")
+     ]
+ 
+     # Qwen LLM
+     qwen_api_key: str = Field(default="", validation_alias="QWEN_API_KEY")
+     qwen_model: str = Field(default="qwen-turbo", validation_alias="QWEN_MODEL")
+     ollama_url: str = Field(default="http://172.17.0.1:11435", validation_alias="OLLAMA_URL")
+ 
++    # LLM Router fallback (Claude -> Qwen). Ver app/services/llm_router.py
++    anthropic_api_key: str = Field(default="", validation_alias="ANTHROPIC_API_KEY")
++    llm_router_url: str = Field(default="http://localhost:20128", validation_alias="LLM_ROUTER_URL")
++    llm_router_api_key: str = Field(default="", validation_alias="LLM_ROUTER_API_KEY")
++
+     # Agent Authentication (Windows/Mac agents)
+     agent_api_key: str = os.getenv("AGENT_API_KEY", "")
+ 
+     # Azure / Office 365 Graph API
+     graph_tenant_id: str = os.getenv("GRAPH_TENANT_ID", "")
+     graph_client_id: str = os.getenv("GRAPH_CLIENT_ID", "")
+     graph_client_secret: str = os.getenv("GRAPH_CLIENT_SECRET", "")
+     graph_mailbox: str = os.getenv("GRAPH_MAILBOX", "admin@ipcms.com.br")
+     onedrive_tenant: str = os.getenv("ONEDRIVE_TENANT", "")
+ 
+diff --git a/v6/backend/app/services/auditor_fable.py b/v6/backend/app/services/auditor_fable.py
+index 06ae8e1..e1f84c2 100644
+--- a/v6/backend/app/services/auditor_fable.py
++++ b/v6/backend/app/services/auditor_fable.py
+@@ -1,27 +1,20 @@
++import asyncio
+ import logging
+ import json
+ import os
+ from sqlalchemy.orm import Session
+ from app.models import Laudo, LaudoVersao, AuditoriaFable
++from app.services.llm_router import get_llm_response
+ 
+ logger = logging.getLogger(__name__)
+ 
+-try:
+-    from anthropic import Anthropic
+-    ANTHROPIC_AVAILABLE = True
+-except ImportError:
+-    ANTHROPIC_AVAILABLE = False
+-    logger.warning("SDK Anthropic não instalado. Instale com: pip install anthropic")
+-
+-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+-
+ PROMPT_FABLE = """ROLE: Você é auditor forense especializado em PERÍCIAS JUDICIAIS brasileiras.
+ 
+ TAREFA: Validar integridade técnica do rascunho de laudo contra normas técnicas, fontes e legislação.
+ 
+ CHECKLIST OBRIGATÓRIO:
+ 
+ ### A. VALIDAÇÃO DE CITAÇÕES (CRÍTICO)
+ Para CADA lei, artigo ou norma citada:
+ - [ ] Existe? (ex: "Art. 406 CC" — SIM. "Art. 1.500 CPC" — NÃO)
+ - [ ] Redação condiz? (compare com norma fornecida)
+@@ -58,27 +51,23 @@ SAÍDA: Relatório JSON estruturado:
+   "erros_criticos": ["❌ Quesito não respondido", ...],
+   "score": 0.82,
+   "recomendacao": "Revisar erros críticos antes de emitir"
+ }
+ ```
+ 
+ IMPORTANTE: Jamais reescreva o laudo. Apenas verifique. Bloqueia emissão se score < 0.6."""
+ 
+ 
+ def auditar_laudo(laudo_id: int, versao_numero: int, db: Session) -> AuditoriaFable:
+-    """Audita rascunho com Fable 5. Retorna AuditoriaFable ou levanta exceção."""
+-    if not ANTHROPIC_AVAILABLE:
+-        raise RuntimeError("SDK Anthropic não instalado")
+-
+-    if not ANTHROPIC_API_KEY:
+-        raise ValueError("ANTHROPIC_API_KEY não configurada")
+-
++    """Audita rascunho com Fable 5 (Claude, com fallback automático para Qwen
++    via app.services.llm_router se a API do Claude estiver com cota estourada
++    ou indisponível). Retorna AuditoriaFable ou levanta exceção."""
+     laudo = db.query(Laudo).filter(Laudo.id == laudo_id).first()
+     if not laudo:
+         raise ValueError(f"Laudo {laudo_id} não encontrado")
+ 
+     versao = db.query(LaudoVersao).filter(
+         LaudoVersao.laudo_id == laudo_id,
+         LaudoVersao.numero_versao == versao_numero
+     ).first()
+ 
+     if not versao:
+@@ -102,41 +91,44 @@ RASCUNHO PARA AUDITAR:
+ {rascunho}
+ 
+ PDF DO PROCESSO (primeiras páginas):
+ {pdf_texto[:3000] if pdf_texto else "[Documentos não fornecidos]"}
+ 
+ NORMA TÉCNICA (referência):
+ NBC TP 01 R2 (Perícia Contábil) / NBR 13752:2024 (Perícia Engenharia)
+ """
+ 
+     try:
+-        client = Anthropic(api_key=ANTHROPIC_API_KEY)
+-        response = client.messages.create(
+-            model="claude-3-5-sonnet-20241022",
+-            max_tokens=2000,
+-            messages=[{"role": "user", "content": prompt}]
++        # get_llm_response tenta Claude e cai automaticamente para Qwen
++        # (Ollama local -> 9router) se a cota estourar ou a chamada falhar.
++        resultado = asyncio.run(
++            get_llm_response(prompt=prompt, model="claude", max_tokens=2000)
+         )
+-
+-        texto_resposta = response.content[0].text
++        texto_resposta = resultado["content"]
++        used_model = resultado["model"]
+ 
+         relatorio_json = _parsear_json_fable(texto_resposta)
++        relatorio_json["_llm_usado"] = used_model
+ 
+         auditoria = AuditoriaFable(
+             laudo_id=laudo_id,
+             versao_numero=versao_numero,
+             relatorio_json=relatorio_json
+         )
+         db.add(auditoria)
+         db.commit()
+         db.refresh(auditoria)
+ 
+-        logger.info(f"Auditoria completa para laudo {laudo_id} v{versao_numero}, score={relatorio_json.get('score', 0)}")
++        logger.info(
++            f"Auditoria completa para laudo {laudo_id} v{versao_numero}, "
++            f"score={relatorio_json.get('score', 0)}, llm={used_model}"
++        )
+         return auditoria
+ 
+     except Exception as e:
+         logger.error(f"Erro ao auditar laudo {laudo_id}: {e}")
+         fallback_relatorio = {
+             "validacoes_ok": [],
+             "avisos": [f"⚠️ Erro ao chamar Fable 5: {str(e)}"],
+             "erros_criticos": ["❌ Auditoria falhou — tente novamente"],
+             "score": 0.0,
+             "recomendacao": "Não emita sem auditoria bem-sucedida"
+diff --git a/v6/backend/app/services/llm_router.py b/v6/backend/app/services/llm_router.py
+new file mode 100644
+index 0000000..b8ac984
+--- /dev/null
++++ b/v6/backend/app/services/llm_router.py
+@@ -0,0 +1,186 @@
++"""LLM Router — fallback automático Claude -> Qwen (local Ollama -> 9router).
++
++Problema que resolve: quando a cota da API Claude estoura (HTTP 429) ou a
++chamada falha por qualquer outro motivo, o sistema não pode simplesmente
++quebrar. Este módulo tenta Claude primeiro e cai automaticamente para Qwen
++(perito-qwen local via Ollama; se o Ollama local estiver fora do ar, tenta
++Qwen via 9router em :20128) sem exigir troca manual em nenhum lugar do código.
++
++Uso:
++    from app.services.llm_router import get_llm_response
++
++    resposta = await get_llm_response("prompt aqui")
++    resposta["content"]      # texto da resposta
++    resposta["model"]        # "claude" | "qwen-ollama" | "qwen-9router"
++"""
++import os
++import json
++import logging
++from typing import Optional
++
++import httpx
++
++logger = logging.getLogger(__name__)
++
++# Claude (Anthropic direto — mesmo padrão usado em auditor_fable.py)
++ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
++CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")
++
++# Qwen local via Ollama nativo (Mac) — mesmo host usado em cerebro_intelligence.py
++OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
++OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "perito-qwen")
++
++# Fallback secundário: 9router (gateway local multi-provider em :20128)
++LLM_ROUTER_URL = os.getenv("LLM_ROUTER_URL", "http://localhost:20128")
++LLM_ROUTER_API_KEY = os.getenv("LLM_ROUTER_API_KEY", "")
++LLM_ROUTER_QWEN_MODEL = os.getenv("LLM_ROUTER_QWEN_MODEL", "ollama/qwen3.5")
++
++
++async def get_llm_response(
++    prompt: str,
++    model: str = "claude",
++    max_tokens: int = 2000,
++    temperature: float = 0.7,
++    fallback_to_qwen: bool = True,
++) -> dict:
++    """Envia prompt para Claude, com fallback automático para Qwen.
++
++    Args:
++        prompt: mensagem do usuário.
++        model: "claude" (tenta Claude primeiro) ou "qwen" (vai direto pro Qwen).
++        fallback_to_qwen: se True (padrão), qualquer falha do Claude
++            (429/quota, timeout, erro de rede, SDK ausente) cai para Qwen
++            automaticamente — sem intervenção manual.
++
++    Returns:
++        {"content": str, "model": str, "stop_reason": str}
++
++    Raises:
++        Exception: se Claude falhar E o fallback estiver desligado, ou se
++            Claude E todos os caminhos de Qwen falharem.
++    """
++    if model == "claude":
++        try:
++            return await _chamar_claude(prompt, max_tokens, temperature)
++        except _ClaudeQuotaError:
++            logger.warning("Claude quota excedida (429), caindo para Qwen")
++        except Exception as e:
++            logger.error(f"Chamada Claude falhou: {e}")
++            if not fallback_to_qwen:
++                raise
++
++        if not fallback_to_qwen:
++            raise Exception("Claude falhou e fallback_to_qwen=False")
++
++        logger.info("Fallback automático: Claude -> Qwen")
++        model = "qwen"
++
++    if model == "qwen":
++        return await _chamar_qwen(prompt, max_tokens, temperature)
++
++    raise Exception(f"Modelo desconhecido: {model}")
++
++
++class _ClaudeQuotaError(Exception):
++    """Marca especificamente estouro de cota (429) do Claude."""
++
++
++async def _chamar_claude(prompt: str, max_tokens: int, temperature: float) -> dict:
++    """Chama Claude via SDK Anthropic direto (mesmo padrão de auditor_fable.py)."""
++    try:
++        from anthropic import Anthropic
++    except ImportError:
++        raise Exception("SDK anthropic não instalado (pip install anthropic)")
++
++    if not ANTHROPIC_API_KEY:
++        raise Exception("ANTHROPIC_API_KEY não configurada")
++
++    import anyio
++
++    def _sync_call():
++        client = Anthropic(api_key=ANTHROPIC_API_KEY)
++        return client.messages.create(
++            model=CLAUDE_MODEL,
++            max_tokens=max_tokens,
++            temperature=temperature,
++            messages=[{"role": "user", "content": prompt}],
++        )
++
++    try:
++        response = await anyio.to_thread.run_sync(_sync_call)
++    except Exception as e:
++        # SDK Anthropic expõe status_code em erros de API (RateLimitError etc.)
++        status_code = getattr(e, "status_code", None)
++        if status_code == 429:
++            raise _ClaudeQuotaError(str(e))
++        raise
++
++    return {
++        "content": response.content[0].text,
++        "model": "claude",
++        "stop_reason": response.stop_reason,
++    }
++
++
++async def _chamar_qwen(prompt: str, max_tokens: int, temperature: float) -> dict:
++    """Chama Qwen local (Ollama); se indisponível, tenta via 9router."""
++    try:
++        return await _chamar_qwen_ollama(prompt, max_tokens, temperature)
++    except Exception as e:
++        logger.warning(f"Qwen via Ollama local falhou ({e}), tentando via 9router")
++
++    try:
++        return await _chamar_qwen_9router(prompt, max_tokens, temperature)
++    except Exception as e:
++        logger.error(f"Qwen via 9router também falhou: {e}")
++        raise Exception(f"Qwen indisponível (Ollama local e 9router falharam): {e}")
++
++
++async def _chamar_qwen_ollama(prompt: str, max_tokens: int, temperature: float) -> dict:
++    async with httpx.AsyncClient(timeout=120) as client:
++        response = await client.post(
++            f"{OLLAMA_URL}/api/generate",
++            json={
++                "model": OLLAMA_MODEL,
++                "prompt": prompt,
++                "stream": False,
++                # think=False: perito-qwen é um modelo "thinking" (Qwen3) e
++                # num_predict conta o raciocínio interno junto com a resposta
++                # final — sem desligar o thinking, prompts curtos truncam
++                # antes de gerar o texto de resposta (response fica vazio).
++                "think": False,
++                "options": {"temperature": temperature, "num_predict": max_tokens},
++            },
++        )
++    response.raise_for_status()
++    data = response.json()
++    return {
++        "content": data.get("response", ""),
++        "model": "qwen-ollama",
++        "stop_reason": data.get("done_reason", "stop"),
++    }
++
++
++async def _chamar_qwen_9router(prompt: str, max_tokens: int, temperature: float) -> dict:
++    headers = {}
++    if LLM_ROUTER_API_KEY:
++        headers["Authorization"] = f"Bearer {LLM_ROUTER_API_KEY}"
++
++    async with httpx.AsyncClient(timeout=60) as client:
++        response = await client.post(
++            f"{LLM_ROUTER_URL}/v1/chat/completions",
++            json={
++                "model": LLM_ROUTER_QWEN_MODEL,
++                "messages": [{"role": "user", "content": prompt}],
++                "max_tokens": max_tokens,
++                "temperature": temperature,
++            },
++            headers=headers,
++        )
++    response.raise_for_status()
++    data = response.json()
++    return {
++        "content": data["choices"][0]["message"]["content"],
++        "model": "qwen-9router",
++        "stop_reason": data["choices"][0].get("finish_reason", "stop"),
++    }
+diff --git a/v6/backend/tests/test_llm_fallback.py b/v6/backend/tests/test_llm_fallback.py
+new file mode 100644
+index 0000000..af995a3
+--- /dev/null
++++ b/v6/backend/tests/test_llm_fallback.py
+@@ -0,0 +1,137 @@
++"""Testes do fallback automático de LLM (Claude -> Qwen).
++
++Não faz chamadas de rede reais: mocka as funções privadas de transporte
++(_chamar_claude, _chamar_qwen_ollama, _chamar_qwen_9router) e valida a
++lógica de decisão de get_llm_response.
++"""
++import pytest
++
++from app.services import llm_router
++
++
++async def test_claude_sucesso_nao_cai_para_qwen(monkeypatch):
++    """Se Claude responde OK, não deve nem tentar Qwen."""
++    chamou_qwen = False
++
++    async def fake_claude(prompt, max_tokens, temperature):
++        return {"content": "resposta claude", "model": "claude", "stop_reason": "end_turn"}
++
++    async def fake_qwen(prompt, max_tokens, temperature):
++        nonlocal chamou_qwen
++        chamou_qwen = True
++        return {"content": "nao deveria chamar", "model": "qwen-ollama", "stop_reason": "stop"}
++
++    monkeypatch.setattr(llm_router, "_chamar_claude", fake_claude)
++    monkeypatch.setattr(llm_router, "_chamar_qwen", fake_qwen)
++
++    resultado = await llm_router.get_llm_response("oi", model="claude")
++
++    assert resultado["model"] == "claude"
++    assert resultado["content"] == "resposta claude"
++    assert chamou_qwen is False
++
++
++async def test_claude_429_cai_automaticamente_para_qwen(monkeypatch):
++    """Cota estourada (429) deve acionar fallback automático para Qwen."""
++
++    async def fake_claude(prompt, max_tokens, temperature):
++        raise llm_router._ClaudeQuotaError("429 rate limit")
++
++    async def fake_qwen(prompt, max_tokens, temperature):
++        return {"content": "resposta qwen", "model": "qwen-ollama", "stop_reason": "stop"}
++
++    monkeypatch.setattr(llm_router, "_chamar_claude", fake_claude)
++    monkeypatch.setattr(llm_router, "_chamar_qwen", fake_qwen)
++
++    resultado = await llm_router.get_llm_response("oi", model="claude")
++
++    assert resultado["model"] == "qwen-ollama"
++    assert resultado["content"] == "resposta qwen"
++
++
++async def test_claude_erro_generico_cai_para_qwen_por_padrao(monkeypatch):
++    """Qualquer falha do Claude (não só 429) deve cair para Qwen por padrão."""
++
++    async def fake_claude(prompt, max_tokens, temperature):
++        raise Exception("timeout de rede")
++
++    async def fake_qwen(prompt, max_tokens, temperature):
++        return {"content": "resposta qwen", "model": "qwen-ollama", "stop_reason": "stop"}
++
++    monkeypatch.setattr(llm_router, "_chamar_claude", fake_claude)
++    monkeypatch.setattr(llm_router, "_chamar_qwen", fake_qwen)
++
++    resultado = await llm_router.get_llm_response("oi", model="claude")
++
++    assert resultado["model"] == "qwen-ollama"
++
++
++async def test_fallback_desligado_propaga_erro_do_claude(monkeypatch):
++    """Com fallback_to_qwen=False, erro do Claude deve subir, sem tentar Qwen."""
++
++    async def fake_claude(prompt, max_tokens, temperature):
++        raise Exception("erro claude")
++
++    monkeypatch.setattr(llm_router, "_chamar_claude", fake_claude)
++
++    with pytest.raises(Exception, match="erro claude"):
++        await llm_router.get_llm_response("oi", model="claude", fallback_to_qwen=False)
++
++
++async def test_qwen_direto_sem_passar_por_claude(monkeypatch):
++    """model='qwen' deve ir direto para Qwen, sem tentar Claude."""
++    chamou_claude = False
++
++    async def fake_claude(prompt, max_tokens, temperature):
++        nonlocal chamou_claude
++        chamou_claude = True
++        return {"content": "x", "model": "claude", "stop_reason": "end_turn"}
++
++    async def fake_qwen(prompt, max_tokens, temperature):
++        return {"content": "resposta qwen direta", "model": "qwen-ollama", "stop_reason": "stop"}
++
++    monkeypatch.setattr(llm_router, "_chamar_claude", fake_claude)
++    monkeypatch.setattr(llm_router, "_chamar_qwen", fake_qwen)
++
++    resultado = await llm_router.get_llm_response("oi", model="qwen")
++
++    assert resultado["model"] == "qwen-ollama"
++    assert chamou_claude is False
++
++
++async def test_qwen_ollama_indisponivel_cai_para_9router(monkeypatch):
++    """Se o Ollama local falhar, _chamar_qwen deve tentar o 9router em seguida."""
++
++    async def fake_ollama(prompt, max_tokens, temperature):
++        raise Exception("Ollama local fora do ar")
++
++    async def fake_9router(prompt, max_tokens, temperature):
++        return {"content": "resposta via 9router", "model": "qwen-9router", "stop_reason": "stop"}
++
++    monkeypatch.setattr(llm_router, "_chamar_qwen_ollama", fake_ollama)
++    monkeypatch.setattr(llm_router, "_chamar_qwen_9router", fake_9router)
++
++    resultado = await llm_router._chamar_qwen("oi", 2000, 0.7)
++
++    assert resultado["model"] == "qwen-9router"
++
++
++async def test_qwen_ollama_e_9router_falham_levanta_excecao(monkeypatch):
++    """Se Ollama local E 9router falharem, deve levantar exceção clara."""
++
++    async def fake_ollama(prompt, max_tokens, temperature):
++        raise Exception("Ollama fora do ar")
++
++    async def fake_9router(prompt, max_tokens, temperature):
++        raise Exception("9router fora do ar")
++
++    monkeypatch.setattr(llm_router, "_chamar_qwen_ollama", fake_ollama)
++    monkeypatch.setattr(llm_router, "_chamar_qwen_9router", fake_9router)
++
++    with pytest.raises(Exception, match="Qwen indisponível"):
++        await llm_router._chamar_qwen("oi", 2000, 0.7)
++
++
++async def test_modelo_desconhecido_levanta_excecao():
++    with pytest.raises(Exception, match="Modelo desconhecido"):
++        await llm_router.get_llm_response("oi", model="gpt4")

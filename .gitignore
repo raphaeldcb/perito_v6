@@ -1,0 +1,112 @@
+# Environment variables (secrets)
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+venv/
+ENV/
+
+# Node/Frontend
+node_modules/
+.npm
+dist/
+build/
+.env.local
+.env.*.local
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+psql_data/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# Docker
+.docker/
+docker.sock
+
+# Temporary
+*.tmp
+temp/
+.cache/
+
+# Local development
+.colima/
+.ollama/
+local_data/
+
+# IDE/Editor cache
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Claude Code
+.claude/
+.superpowers/
+
+# Backups
+*.bak
+*.backup
+backups/
+Backups-Perito/
+
+# Test databases
+test.db
+perito.db
+
+# Downloads (personal files)
+Downloads/
+Personal/
+
+# Misc
+.env.example.local
+credentials.json
+*.pfx
+*.pem

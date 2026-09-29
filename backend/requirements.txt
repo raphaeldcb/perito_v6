@@ -1,26 +1,89 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
+# FastAPI + SQLAlchemy + JWT — PERITO v6.0
+# Production-ready dependencies
+
+# Core
+fastapi==0.109.2
+uvicorn[standard]==0.27.0
+python-dotenv==1.0.0
+
+# Database
 sqlalchemy==2.0.23
-pydantic==2.5.0
-pydantic-settings==2.1.0
-python-multipart==0.0.6
+psycopg2-binary==2.9.9
+pgvector==0.2.2
+alembic==1.13.1
+
+# Authentication
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-python-dotenv==1.0.0
+bcrypt==4.0.1  # pin: passlib 1.7.4 quebra com bcrypt >= 4.1 (hash falha e o seed do admin nunca roda)
+python-multipart==0.0.6
+cryptography==41.0.7
+
+# API
+pydantic==2.5.2
+pydantic-settings==2.1.0
+email-validator==2.1.0
+
+# CORS
+fastapi-cors==0.0.6
+
+# Rate Limiting (security P1)
+slowapi==0.1.9
+
+# Utilities
 requests==2.31.0
 httpx==0.25.2
 
-# Data export and anonymization
-faker==19.3.0
-psycopg2-binary==2.9.9
-
-# Testing
+# Testing & CI/CD
 pytest==7.4.4
 pytest-asyncio==0.23.2
 pytest-cov==4.1.0
-anyio==3.7.1
+pylint==3.0.3
+pyright==1.1.335
 
-# Development
-black==23.12.1
+# Security — P0 Formula Injection Fix
+simpleeval==0.9.12
+
+# Security — P0 File Cleanup Scheduler
+schedule==1.2.0
+werkzeug==3.0.1
+
+# AI — Qwen 3.6 Integration
+dashscope==1.13.0
+ollama==0.1.0
+
+# Workers — captura de intimações (via Microsoft Graph/requests) e análise
+pypdf==4.2.0
+# Ofícios e laudos em Word (fluxo completo)
+python-docx==1.1.2
+# Geração de comprovantes/relatórios (PDF + Excel)
+fpdf2==2.7.9
+openpyxl==3.1.2
+# Extração de texto de PDF (Task 8 calculo_v2: Qwen lê a decisão oficial)
+pdfplumber==0.11.10
+
+# Logging
+python-json-logger==2.0.7
+
+# Event Bus & Task Queue (Task 15 — Wave 2)
+redis==5.0.1
+redis[hiredis]==5.0.1
+
+# AI — Anthropic SDK (para fallback de routing)
+anthropic==0.7.0
+
+# JWT — Suporte adicional (gerado por python-jose, mas incluso)
+PyJWT==2.13.0
+
+# DevTools
+black==23.12.0
 flake8==6.1.0
+isort==5.13.2
 mypy==1.7.1
+num2words
+geopy==2.4.0
+
+# PDF generation for engineering reports
+reportlab>=4.0
+fpdf2>=2.7.0
+google-auth==2.28.0

@@ -1,0 +1,17 @@
+diff --git a/v6/README.md b/v6/README.md
+index 1cf6da3..88c52cd 100644
+--- a/v6/README.md
++++ b/v6/README.md
+@@ -309,10 +309,12 @@ python -m app.seed  # Recriar
+ 
+ ---
+ 
+ **Pronto para começar?** 🚀
+ 
+ ```bash
+ cd v6
+ docker-compose up -d
+ # Acesse: http://localhost
+ ```
++
++<!-- SSH key fixed on 2026-08-17 11:28:38 (Ed25519, host alias vps-perito) -->
