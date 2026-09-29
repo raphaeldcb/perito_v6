@@ -7,6 +7,7 @@ metadata:
   session: 20260714
   status: PRONTO PARA RODAR
   originSessionId: dcebcc85-5ffd-487b-bfef-21b2e9f16b0d
+  modified: 2026-09-29T19:58:25.160Z
 ---
 
 # ✅ PJe TJMT — Automação Completa 14/07/26
@@ -87,15 +88,19 @@ metadata:
 
 ---
 
-## Credenciais (Salvos em Memória)
+## Credenciais (Veja VPS)
+
+⚠️ **SECRETS REMOVIDOS DO REPOSITÓRIO**
+
+Localizadas em: `/var/www/perito-v6/backend/.env` no VPS
 
 ```
-TENANT_ID: cb5ff6f4-4845-46fd-9eb6-5ca720f7ae7b ✅
-CLIENT_ID: 56fd2738-851e-4482-959d-c3fcea794d90 ✅
-CLIENT_SECRET: ***REMOVED*** ✅
+TENANT_ID: <veja VPS> ✅
+CLIENT_ID: <veja VPS> ✅
+CLIENT_SECRET: <veja VPS> ✅
 MAILBOX: adm@ipcms.com.br ✅
 API_URL: http://129.121.34.186:8000 ✅
-AGENT_KEY: perito-mac-agent-key-v6-2026-07-14 ✅
+AGENT_KEY: <veja VPS> ✅
 ```
 
 ---

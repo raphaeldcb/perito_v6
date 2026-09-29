@@ -4,6 +4,7 @@ description: "Pipeline autônomo IPC — arquitetura completa Ollama-first + Cla
 metadata:
   type: project
   originSessionId: b0cc2ab7-a18a-4b27-8166-5333724f573e
+  modified: 2026-09-29T19:58:38.649Z
 ---
 
 ## Arquitetura atual (Ollama-first + Claude Revisor + RAG)
@@ -193,11 +194,11 @@ Sequência OBRIGATÓRIA (direto para abrirPastaDigital.do não funciona):
 
 ## Credenciais
 
-- VPS: `sistema.ipcms.com.br` — admin / Admin@2026
-- JWT_SECRET VPS: `***REMOVED***`
-- ESAJ perfil IPC: `PERFIL_IPC_ID = "192743"`
-- ESAJ segredo processo 0800472-51.2017.8.12.0037: `***REMOVED***`
-- DataJud API key: `***REMOVED***`
-- Microsoft Graph: CLIENT_ID=56fd2738-851e-4482-959d-c3fcea794d90, CLIENT_SECRET=***REMOVED***, TENANT=cb5ff6f4-4845-46fd-9eb6-5ca720f7ae7b
-- Email/OneDrive password: `***REMOVED***`
-- NFSE cert password: `***REMOVED***`
+- VPS: `sistema.ipcms.com.br` — credentials in VPS `/var/www/perito-v6/backend/.env`
+- JWT_SECRET VPS: see `/var/www/perito-v6/backend/.env`
+- ESAJ perfil IPC: `192743` (public)
+- ESAJ segredo processo: **NOT IN REPO** (VPS only)
+- DataJud API key: **NOT IN REPO** (VPS only)
+- Microsoft Graph: **NOT IN REPO** (VPS `.env` only)
+- Email/OneDrive password: **NOT IN REPO** (VPS only)
+- NFSE cert password: **NOT IN REPO** (VPS only)

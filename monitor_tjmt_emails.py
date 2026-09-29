@@ -27,12 +27,12 @@ from pathlib import Path
 from markupsafe import escape
 
 # ── Configuração ─────────────────────────────────────────────────────────────
-TENANT = "cb5ff6f4-4845-46fd-9eb6-5ca720f7ae7b"
-CLIENT_ID = "56fd2738-851e-4482-959d-c3fcea794d90"
-CLIENT_SECRET = "***REMOVED***"  # ✅ ATUALIZADO
-MAILBOX = "adm@ipcms.com.br"
+TENANT = os.getenv("GRAPH_TENANT_ID", "")
+CLIENT_ID = os.getenv("GRAPH_CLIENT_ID", "")
+CLIENT_SECRET = os.getenv("GRAPH_CLIENT_SECRET", "")  # Load from environment
+MAILBOX = os.getenv("GRAPH_MAILBOX", "adm@ipcms.com.br")
 API_URL = os.getenv("PERITO_API_URL", "http://129.121.34.186:8000")
-API_KEY = os.getenv("AGENT_API_KEY", "c6861ec2-2d07-4410-b9a4-53bf50ff4198")
+API_KEY = os.getenv("AGENT_API_KEY", "")
 
 log = logging.getLogger("monitor_tjmt")
 
