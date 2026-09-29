@@ -80,7 +80,8 @@
 - [🎯 Skill CodeMail](skill_codemail.md) — 25/07/26 ✅ Extração 2FA de email via Graph API; reutilizável para ESAJ/TJMS/SafeKey/NFS-e
 
 ## Referências
-- [12/08/26 ✅ GitHub Backup Configurado](github_backup_configurado.md) — SSH Deploy Key ativa, 4 branches pushed (main/develop/feature/v6-architecture/fix/ui-ajustes-perito), 32MB código clean, Private repo grátis
+- [29/09/26 ✅ GitHub Migration Complete](github_migration_29_09_2026.md) — Migrado para https://github.com/raphaeldcb/perito_v6.git; histórico reescrito (45 commits, secrets removidos); 32MB código clean
+- [12/08/26 ✅ GitHub Backup](github_backup_configurado.md) — anterior (ipc-projects/perito-v6)
 - [27/07/26 🐢→⚡ FREE.command lento/quebrado — RESOLVIDO+TESTADO](free_command_lento_ram.md) — 2 causas: (1) 35B vaza 19% p/ CPU em 24GB; (2) Claude Code força thinking → modelo sem thinking dá **400** (coder models NÃO servem!); fix = **qwen3:14b** (thinking + 100% GPU, testado 200 OK)
 - [27/07/26 🔧 Boletos destruídos → recuperados via Graph](boletos_recuperacao_versao_graph.md) — 174 "ilegíveis" eram **sobrescritos por bug de rename 29/04**; versão anterior no SharePoint (Graph `Files.Read.All`, drive GERENCIA); **61 recuperados+conferidos**; senha fatura Itaú=`00022`; ⚠️ Qwen ALUCINA total de fatura (não usar)
 - [⚠️ TIPOS DE PERÍCIA](tipos_pericia.md) — 23/07/26 DEFINITIVO: Judicial, Extrajudicial, AT (Assistência Técnica); **MODALIDADE** de contratação (≠ SETOR/especialidade)
