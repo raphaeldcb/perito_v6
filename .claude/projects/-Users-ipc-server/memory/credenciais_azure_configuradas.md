@@ -8,6 +8,7 @@ metadata:
   configured: 2026-07-14 14:30 UTC
   status: ATIVO — Docker backend rodando com credenciais
   originSessionId: dcebcc85-5ffd-487b-bfef-21b2e9f16b0d
+  modified: 2026-09-29T19:58:09.073Z
 ---
 
 # 🔐 Credenciais Azure — CONFIGURADAS E LIVE
@@ -23,18 +24,24 @@ metadata:
 
 ---
 
-## Credenciais (Sensível — Bruno passed)
+## Credenciais (Sensível — NÃO COMMITTAR)
+
+⚠️ **SECRETS REMOVIDOS DO REPOSITÓRIO POR SEGURANÇA**
+
+Localizadas em: `/var/www/perito-v6/backend/.env` no VPS
 
 ```env
-GRAPH_CLIENT_ID=56fd2738-851e-4482-959d-c3fcea794d90
-GRAPH_CLIENT_SECRET=***REMOVED***
-GRAPH_TENANT_ID=88a5b9ab-1b80-40a2-b5b3-19b409f7da95
+GRAPH_CLIENT_ID=<veja VPS>
+GRAPH_CLIENT_SECRET=<veja VPS>
+GRAPH_TENANT_ID=<veja VPS>
 GRAPH_MAILBOX=adm@ipcms.com.br
-ONEDRIVE_TENANT=88a5b9ab-1b80-40a2-b5b3-19b409f7da95
-AZURE_CLIENT_ID=56fd2738-851e-4482-959d-c3fcea794d90
-AZURE_CLIENT_SECRET=***REMOVED***
-AZURE_TENANT_ID=88a5b9ab-1b80-40a2-b5b3-19b409f7da95
+ONEDRIVE_TENANT=<veja VPS>
+AZURE_CLIENT_ID=<veja VPS>
+AZURE_CLIENT_SECRET=<veja VPS>
+AZURE_TENANT_ID=<veja VPS>
 ```
+
+**Para acessar**: `ssh root@129.121.34.186 -p 22022 && cat /var/www/perito-v6/backend/.env`
 
 ---
 
